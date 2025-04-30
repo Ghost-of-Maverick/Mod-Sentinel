@@ -5,7 +5,7 @@ import threading
 from packet_capture import start_sniffer
 from packet_buffer import packet_queue
 from parser import parse_modbus_packet
-from detector import detect
+from detector import init_detector, detect  # <- IMPORTANTE
 from logger import log_event
 from utils import write_pid, remove_pid, check_pid
 from app_logger import logger
@@ -23,11 +23,16 @@ def generate_test_packet():
         "length": 6,
         "unit_id": 1,
         "function_code": 99,
-        "payload": "deadbeef"
+        "payload": "63deadbeef"  # <-- inclui FC 99 no início
     }
 
 def daemon_loop():
     config = load_config()
+
+    # 🚨 INICIALIZAR DETETOR COM AS REGRAS
+    rules_file = config.get("rules_file", "rules/modguard.rules")
+    init_detector(rules_file)
+
     interface = config.get('interface', 'eth0')
     verbose_mode = config.get('verbose_mode', False)
     test_mode = config.get('test_mode', False)
