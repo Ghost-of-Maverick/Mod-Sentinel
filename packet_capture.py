@@ -1,9 +1,12 @@
 from scapy.all import sniff
+from packet_buffer import packet_queue
+from app_logger import logger
+from datetime import datetime
 
-def modbus_filter(packet):
-    return packet.haslayer('TCP') and packet['TCP'].dport == 502
+def packet_handler(packet):
+    packet_queue.put(packet)
 
-def capture_packets(interface):
-    packets = sniff(iface=interface, filter="tcp port 502", prn=lambda x:x, store=False)
-    for packet in packets:
-        yield packet
+def start_sniffer(interface):
+    logger.info(f"Sniffer iniciado na interface {interface}")
+    sniff(iface=interface, filter="tcp port 502", prn=packet_handler, store=False)
+

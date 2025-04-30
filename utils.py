@@ -25,6 +25,8 @@ def check_pid():
 def tail_logs(n=10):
     try:
         with open(LOG_FILE, 'r') as f:
-            return ''.join(f.readlines()[-n:])
+            lines = f.readlines()
+            return ''.join(lines[-n:])
     except FileNotFoundError:
-        return "Sem logs disponíveis."
+        return "Ficheiro de log não encontrado."
+

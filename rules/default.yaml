@@ -1,5 +1,7 @@
 rules:
   - function_code: 5
-    description: "Escrita num coil individual (potencialmente perigoso)"
+    description: "Escrita num coil individual"
   - function_code: 6
     description: "Escrita num registo individual"
+  - function_code: 99
+    description: "[TESTE] Pacote Modbus artificial para validação"
