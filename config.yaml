@@ -1,4 +1,4 @@
-interface: eth0
+interface: eth1
 log_level: INFO
 
 # Modos de debug/teste
@@ -7,10 +7,9 @@ test_mode: true # Gera pacotes artificiais periodicamente
 test_interval: 5 # Intervalo em segundos para pacotes artificiais
 
 MODBUS_CLIENT:
-  - 192.168.1.10
-  - 192.168.1.11
+  - 172.27.224.10
 
 MODBUS_SERVER:
-  - 192.168.1.20
+  - 172.27.224.250
 
-rules_file: rules/modguard.rules
+rules_file: rules/modsentinel.rules

@@ -4,6 +4,14 @@
 #   MODBUS_CLIENT
 #   MODBUS_SERVER
 
+# Regra de teste
+alert tcp any any -> any 502 (
+    content:"|63|"; offset:0; depth:4;
+    msg:"[TESTE] Pacote artificial com FC 99";
+    sid:999999; priority:0;
+)
+
+# Regras Modbus TCP
 alert tcp $MODBUS_CLIENT any -> $MODBUS_SERVER 502 (
     content:"|08 00 04|"; offset:7; depth:3;
     msg:"SCADA_IDS: Modbus TCP - Force Listen Only Mode";
@@ -84,7 +92,7 @@ alert tcp $MODBUS_SERVER 502 -> $MODBUS_CLIENT any (
     sid:1111014; priority:2;
 )
 
-# Schneider Modicon Function Code 90 - ladder logic operations
+# Regras Modicon Ladder Logic
 alert tcp any any -> any 502 (
     content:"|00 5a 01 34 00 01|";
     msg:"Schneider Modicon - Download Ladder Logic Started";
@@ -103,9 +111,3 @@ alert udp !$MODICON_CLIENT any -> any 502 (
     sid:1111017; priority:1;
 )
 
-# Regra de teste
-alert tcp any any -> any 502 (
-    content:"|63|"; offset:0; depth:4;
-    msg:"[TESTE] Pacote artificial com FC 99";
-    sid:999999; priority:0;
-)

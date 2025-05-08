@@ -19,7 +19,7 @@ def get_log_level():
         return logging.INFO
 
 # Logger principal
-logger = logging.getLogger("ModGuardApp")
+logger = logging.getLogger("ModSentinelApp")
 logger.setLevel(logging.DEBUG)  # Sempre DEBUG aqui para captar tudo internamente
 
 # Formato padrão

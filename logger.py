@@ -1,7 +1,6 @@
-import json
 from datetime import datetime
 
-LOG_FILE = 'logs/modguard.log'
+LOG_FILE = 'logs/modsentinel.log'
 
 def log_event(packet, data, status, rule):
     # Suporte para pacotes falsos (modo de teste)
@@ -16,17 +15,26 @@ def log_event(packet, data, status, rule):
         src_port = packet['TCP'].sport
         dst_port = packet['TCP'].dport
 
-    event = {
-        "timestamp": datetime.now().isoformat(),
-        "src_ip": src_ip,
-        "dst_ip": dst_ip,
-        "src_port": src_port,
-        "dst_port": dst_port,
-        "function_code": data['function_code'],
-        "payload": data['payload'],
-        "status": status,
-        "rule": rule
-    }
+    timestamp = datetime.now().strftime("[%Y-%m-%d %H:%M:%S]")
+    function_code = data.get('function_code', '?')
+    payload = data.get('payload', '')
+    payload_short = payload[:32] + "..." if len(payload) > 32 else payload
+
+    # Formatação multi-linha clara
+    if status == "Malicious":
+        log_msg = (
+            f"{timestamp} ALERT: Malicious Modbus Packet Detected\n"
+            f"→ From: {src_ip}:{src_port} → To: {dst_ip}:{dst_port}\n"
+            f"→ Function Code: {function_code}\n"
+            f"→ Payload: {payload_short}\n"
+            f"→ Rule: {rule}\n"
+        )
+    else:
+        log_msg = (
+            f"{timestamp} INFO: Normal Modbus Packet\n"
+            f"→ From: {src_ip}:{src_port} → To: {dst_ip}:{dst_port}\n"
+            f"→ Function Code: {function_code}\n"
+        )
 
     with open(LOG_FILE, 'a') as f:
-        f.write(json.dumps(event) + '\n')
+        f.write(log_msg + "\n")

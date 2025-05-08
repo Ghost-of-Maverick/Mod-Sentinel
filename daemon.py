@@ -28,9 +28,8 @@ def generate_test_packet():
 
 def daemon_loop():
     config = load_config()
-
-    # 🚨 INICIALIZAR DETETOR COM AS REGRAS
-    rules_file = config.get("rules_file", "rules/modguard.rules")
+    
+    rules_file = config.get("rules_file", "rules/modsentinel.rules")
     init_detector(rules_file)
 
     interface = config.get('interface', 'eth0')
@@ -40,7 +39,7 @@ def daemon_loop():
 
     last_test_log = time.time()
 
-    logger.info("ModGuard iniciado.")
+    logger.info("ModSentinel iniciado.")
     logger.info(f"Interface configurada: {interface}")
     if test_mode:
         logger.info("Modo de teste ativo.")
@@ -82,7 +81,7 @@ def daemon_loop():
 
 def start_daemon():
     if check_pid():
-        logger.warning("ModGuard já está em execução.")
+        logger.warning("ModSentinel já está em execução.")
         return
     pid = os.fork()
     if pid == 0:
@@ -91,7 +90,7 @@ def start_daemon():
         try:
             daemon_loop()
         finally:
-            logger.info("ModGuard terminou. A remover PID.")
+            logger.info("ModSentinel terminou. A remover PID.")
             remove_pid()
 
 def stop_daemon():
@@ -104,4 +103,4 @@ def stop_daemon():
             logger.warning("PID inválido. A remover ficheiro.")
         remove_pid()
     else:
-        logger.warning("Tentativa de parar ModGuard, mas nenhum processo ativo.")
+        logger.warning("Tentativa de parar ModSentinel, mas nenhum processo ativo.")

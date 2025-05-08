@@ -1,7 +1,7 @@
 import os
 
-PID_FILE = '/tmp/modguard.pid'
-LOG_FILE = 'logs/modguard.log'
+PID_FILE = '/tmp/modsentinel.pid'
+LOG_FILE = 'logs/modsentinel.log'
 
 def write_pid():
     with open(PID_FILE, 'w') as f:
