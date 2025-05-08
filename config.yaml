@@ -1,5 +1,4 @@
 interface: eth1
-log_level: INFO
 
 # Modos de debug/teste
 verbose_mode: true # modo verbose ativo/desativo
