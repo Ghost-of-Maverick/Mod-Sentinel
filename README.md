@@ -1,6 +1,6 @@
-## 🛡️ModSentinel
+## 🛡️Mod Sentinel
 
-O **ModSentinel** é uma aplicação Python de deteção de anomalias e ataques ao protocolo Modbus, focado na proteção de infraestruturas industriais. Foi desenvolvido para funcionar de forma passiva em modo sniffer, analisando o tráfego de rede industrial em tempo real uma vez que funciona como um Daemon.
+O **Mod Sentinel** é uma aplicação Python de deteção de anomalias e ataques ao protocolo Modbus, focado na proteção de infraestruturas industriais. Foi desenvolvido para funcionar de forma passiva em modo sniffer, analisando o tráfego de rede industrial em tempo real uma vez que funciona como um Daemon.
 
 ## 📦 Clonagem do Projeto
 
