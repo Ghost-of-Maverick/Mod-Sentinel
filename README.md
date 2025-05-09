@@ -5,7 +5,7 @@ O **ModSentinel** é uma aplicação Python de deteção de anomalias e ataques 
 ## 📦 Clonagem do Projeto
 
 ```bash
-git clone https://github.com/Ghost-of-Maverick/ModSentinel.git
+git clone https://github.com/Ghost-of-Maverick/Mod-Sentinel.git
 cd Mod-Sentinel
 ```
 
