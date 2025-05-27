@@ -1,9 +1,15 @@
 interface: eth1
+verbose_mode: true
+test_mode: true
+test_interval: 5
 
-# Modos de debug/teste
-verbose_mode: true # modo verbose ativo/desativo
-test_mode: true # Gera pacotes artificiais periodicamente
-test_interval: 5 # Intervalo em segundos para pacotes artificiais
+pcap_capture:
+  enabled: true
+  file: logs/capture.pcap
+
+csv_logging:
+  enabled: true
+  file: logs/traffic.csv
 
 MODBUS_CLIENT:
   - 172.27.224.10

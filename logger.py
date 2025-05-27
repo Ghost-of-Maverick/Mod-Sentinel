@@ -1,6 +1,13 @@
+import os
 from datetime import datetime
 
-LOG_FILE = 'logs/modsentinel.log'
+# Garante que existe a pasta de logs
+LOG_DIR = 'logs'
+os.makedirs(LOG_DIR, exist_ok=True)
+
+# Gera nome único por execução com timestamp
+log_filename = f"modsentinel_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+LOG_FILE = os.path.join(LOG_DIR, log_filename)
 
 def log_event(packet, data, status, rule):
     # Suporte para pacotes falsos (modo de teste)
@@ -20,24 +27,15 @@ def log_event(packet, data, status, rule):
     payload = data.get('payload', '')
     payload_short = payload[:32] + "..." if len(payload) > 32 else payload
 
-    if status == "Malicious":
-        log_msg = (
-            f"{timestamp} !!! MALICIOUS PACKET DETECTED !!!\n"
-            f"→ From: {src_ip}:{src_port} → To: {dst_ip}:{dst_port}\n"
-            f"→ Function Code: {function_code}\n"
-            f"→ Payload: {payload_short}\n"
-            f"→ Status: {status}\n"
-            f"→ Rule Triggered: {rule}\n"
-        )
-        logger.warning(log_msg.strip())
-    else:
-        log_msg = (
-            f"{timestamp} INFO: Normal Modbus Packet\n"
-            f"→ From: {src_ip}:{src_port} → To: {dst_ip}:{dst_port}\n"
-            f"→ Function Code: {function_code}\n"
-            f"→ Status: {status}\n"
-        )
-        logger.info(log_msg.strip())
+    log_msg = (
+        f"{timestamp} STATUS: {status}\n"
+        f"→ From: {src_ip}:{src_port} → To: {dst_ip}:{dst_port}\n"
+        f"→ Function Code: {function_code}\n"
+        f"→ Payload: {payload_short}\n"
+    )
+
+    if rule:
+        log_msg += f"→ Rule: {rule}\n"
 
     with open(LOG_FILE, 'a') as f:
         f.write(log_msg + "\n")

@@ -2,13 +2,23 @@ import os
 import time
 import yaml
 import threading
-from packet_capture import start_sniffer
-from packet_buffer import packet_queue
-from parser import parse_modbus_packet
-from detector import init_detector, detect  # <- IMPORTANTE
+from datetime import datetime
+from packet_capture import start_tshark_capture, stop_tshark_capture
+from tshark_parser import tshark_packet_queue
+from detector import init_detector, detect
 from logger import log_event
+from csv_logger import log_to_csv, set_csv_file
 from utils import write_pid, remove_pid, check_pid
 from app_logger import logger
+
+# Gera nomes únicos por execução
+TIMESTAMP = datetime.now().strftime('%Y%m%d_%H%M%S')
+PCAP_FULL = f"logs/captura_completa_{TIMESTAMP}.pcap"
+PCAP_MODBUS = f"logs/captura_modbus_{TIMESTAMP}.pcap"
+CSV_FILE = f"logs/trafego_{TIMESTAMP}.csv"
+
+# Cria diretório de logs se necessário
+os.makedirs("logs", exist_ok=True)
 
 CONFIG_FILE = 'config.yaml'
 
@@ -23,12 +33,12 @@ def generate_test_packet():
         "length": 6,
         "unit_id": 1,
         "function_code": 99,
-        "payload": "63deadbeef"  # <-- inclui FC 99 no início
+        "payload": "63deadbeef"
     }
 
 def daemon_loop():
     config = load_config()
-    
+
     rules_file = config.get("rules_file", "rules/modsentinel.rules")
     init_detector(rules_file)
 
@@ -37,8 +47,6 @@ def daemon_loop():
     test_mode = config.get('test_mode', False)
     test_interval = config.get('test_interval', 5)
 
-    last_test_log = time.time()
-
     logger.info("ModSentinel iniciado.")
     logger.info(f"Interface configurada: {interface}")
     if test_mode:
@@ -46,38 +54,51 @@ def daemon_loop():
     if verbose_mode:
         logger.info("Modo verbose ativo.")
 
-    sniffer_thread = threading.Thread(target=start_sniffer, args=(interface,), daemon=True)
-    sniffer_thread.start()
-    logger.info("Thread de captura iniciada.")
+    # Define o ficheiro CSV para esta execução
+    set_csv_file(CSV_FILE)
 
-    while True:
-        try:
-            if not packet_queue.empty():
-                packet = packet_queue.get()
-                modbus_data = parse_modbus_packet(packet)
-                if modbus_data:
-                    status, rule = detect(modbus_data)
+    # Inicia captura tshark
+    full_proc, modbus_proc = start_tshark_capture(interface, PCAP_FULL, PCAP_MODBUS)
+
+    if full_proc and modbus_proc:
+        logger.info("Captura com tshark iniciada.")
+
+    last_test_log = time.time()
+
+    try:
+        while True:
+            try:
+                if not tshark_packet_queue.empty():
+                    parsed_packet = tshark_packet_queue.get()
+                    status, rule = detect(parsed_packet)
                     if verbose_mode:
-                        logger.info(f"[VERBOSE] Pacote Modbus: {packet['IP'].src}:{packet['TCP'].sport} → "
-                                    f"{packet['IP'].dst}:{packet['TCP'].dport}, FC: {modbus_data['function_code']}")
-                    log_event(packet, modbus_data, status, rule)
+                        logger.info(
+                            f"[VERBOSE] Modbus: {parsed_packet['IP']['src']}:{parsed_packet['TCP']['sport']} → "
+                            f"{parsed_packet['IP']['dst']}:{parsed_packet['TCP']['dport']} | FC: {parsed_packet['function_code']}"
+                        )
+                    log_event(parsed_packet, parsed_packet, status, rule)
+                    log_to_csv(parsed_packet, parsed_packet)
 
-        except Exception as e:
-            logger.exception(f"Erro ao processar pacote: {e}")
+            except Exception as e:
+                logger.exception(f"Erro ao processar pacote: {e}")
 
-        if test_mode and (time.time() - last_test_log >= test_interval):
-            modbus_data = generate_test_packet()
-            status, rule = detect(modbus_data)
-            fake_packet = {
-                'IP': {'src': '192.0.2.1', 'dst': '192.0.2.2'},
-                'TCP': {'sport': 12345, 'dport': 502}
-            }
-            if verbose_mode:
-                logger.info(f"[VERBOSE][TEST MODE] Pacote gerado: FC: {modbus_data['function_code']}")
-            log_event(fake_packet, modbus_data, status, rule)
-            last_test_log = time.time()
+            if test_mode and (time.time() - last_test_log >= test_interval):
+                modbus_data = generate_test_packet()
+                status, rule = detect(modbus_data)
+                fake_packet = {
+                    'IP': {'src': '192.0.2.1', 'dst': '192.0.2.2'},
+                    'TCP': {'sport': 12345, 'dport': 502}
+                }
+                if verbose_mode:
+                    logger.info(f"[VERBOSE][TEST MODE] Pacote gerado: FC: {modbus_data['function_code']}")
+                log_event(fake_packet, modbus_data, status, rule)
+                log_to_csv(fake_packet, modbus_data)
+                last_test_log = time.time()
 
-        time.sleep(0.1)
+            time.sleep(0.1)
+    finally:
+        stop_tshark_capture(full_proc, modbus_proc)
+        logger.info("Captura tshark terminada.")
 
 def start_daemon():
     if check_pid():
