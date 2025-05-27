@@ -1,24 +1,24 @@
-## 🛡️ModSentinel
+## 🛡️Mod Sentinel
 
-O **ModSentinel** é uma aplicação Python de deteção de anomalias e ataques ao protocolo Modbus, focado na proteção de infraestruturas industriais. Foi desenvolvido para funcionar de forma passiva em modo sniffer, analisando o tráfego de rede industrial em tempo real uma vez que funciona como um Daemon.
+O **Mod Sentinel** é uma aplicação Python de deteção de anomalias e ataques ao protocolo Modbus, focado na proteção de infraestruturas industriais. Foi desenvolvido para funcionar de forma passiva em modo sniffer, analisando o tráfego de rede industrial em tempo real uma vez que funciona como um Daemon.
 
 ## 📦 Clonagem do Projeto
 
 ```bash
-git clone https://github.com/seu-utilizador/ModSentinel.git
-cd ModSentinel
+git clone https://github.com/Ghost-of-Maverick/Mod-Sentinel.git
+cd Mod-Sentinel
 ```
 
 ## ⚙️ Requisitos
 
-Certifica-te de que tens o Python 3.8+ instalado. Depois, instala os requisitos:
+Certificar de que tens o Python 3.8+ está instalado. Depois, instalar os requisitos:
 ```bash
 pip install -r requirements.txt
 ```
 
 ## 🚀 Execução
 
-O sistema pode ser iniciado, parado ou reiniciado através do comando principal:
+A aplicação pode ser iniciada, parada ou reiniciada através do comando principal:
 ```bash
 python main.py [start|stop|restart|help]
 ```
@@ -74,5 +74,5 @@ alert tcp $MODBUS_CLIENT any -> $MODBUS_SERVER 502 (
 ## 📂 Logs
 
 Os eventos são registados em:
-  - `logs/app.log` - logs internos do ModSentinel
+  - `logs/app.log` - logs internos do Mod Sentinel
   - `logs/modguard.log` - deteções e pacotes analisados
