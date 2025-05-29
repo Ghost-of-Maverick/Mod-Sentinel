@@ -1,15 +1,7 @@
 interface: eth1
 verbose_mode: true
-test_mode: true
-test_interval: 5
-
-pcap_capture:
-  enabled: true
-  file: logs/capture.pcap
-
-csv_logging:
-  enabled: true
-  file: logs/traffic.csv
+test_mode: false
+test_interval: 50
 
 MODBUS_CLIENT:
   - 172.27.224.10

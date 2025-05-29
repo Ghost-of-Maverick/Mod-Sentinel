@@ -11,13 +11,11 @@ from csv_logger import log_to_csv, set_csv_file
 from utils import write_pid, remove_pid, check_pid
 from app_logger import logger
 
-# Gera nomes únicos por execução
 TIMESTAMP = datetime.now().strftime('%Y%m%d_%H%M%S')
 PCAP_FULL = f"logs/captura_completa_{TIMESTAMP}.pcap"
 PCAP_MODBUS = f"logs/captura_modbus_{TIMESTAMP}.pcap"
 CSV_FILE = f"logs/trafego_{TIMESTAMP}.csv"
 
-# Cria diretório de logs se necessário
 os.makedirs("logs", exist_ok=True)
 
 CONFIG_FILE = 'config.yaml'
@@ -54,8 +52,9 @@ def daemon_loop():
     if verbose_mode:
         logger.info("Modo verbose ativo.")
 
-    # Define o ficheiro CSV para esta execução
+    # Define o ficheiro CSV e inicia o parser tshark
     set_csv_file(CSV_FILE)
+    start_tshark_parser()
 
     # Inicia captura tshark
     full_proc, modbus_proc = start_tshark_capture(interface, PCAP_FULL, PCAP_MODBUS)
