@@ -3,6 +3,30 @@ import subprocess
 import json
 from queue import Queue
 from typing import Optional, Dict
+import yaml
+from app_logger import logger
+
+allowed_macs = {}
+ip_mac_table = {}
+
+def load_allowed_macs():
+    try:
+        with open("config.yaml", "r") as f:
+            config = yaml.safe_load(f)
+            macs = config.get("allowed_macs", {})
+            return {ip: mac.lower() for ip, mac in macs.items()}
+    except Exception:
+        return {}
+
+def check_arp(ip: str, mac: str) -> None:
+    mac = mac.lower()
+    expected = allowed_macs.get(ip)
+    previous = ip_mac_table.get(ip)
+    if expected and mac != expected:
+        logger.warning(f"[ARP] IP {ip} esperado {expected}, recebido {mac}")
+    elif previous and mac != previous:
+        logger.warning(f"[ARP] IP {ip} alterou de {previous} para {mac}")
+    ip_mac_table[ip] = mac
 
 
 def parse_modbus_packet(tcp_payload: bytes) -> Optional[Dict[str, int | str]]:
@@ -39,13 +63,14 @@ def load_interface():
 
 def tshark_parser_thread():
     interface = load_interface()
+    global allowed_macs
+    allowed_macs = load_allowed_macs()
     cmd = [
         "tshark", "-l", "-i", interface,
-        "-Y", "tcp.port == 502",
+        "-Y", "tcp.port == 502 || arp",
         "-d", "tcp.port==502,modbus",
         "-T", "json"
     ]
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
 
     try:
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
@@ -68,6 +93,12 @@ def tshark_parser_thread():
                         tcp_dport = int(layers.get("tcp.dstport", [0])[0])
                         tcp_flags = layers.get("tcp.flags", [""])[0]
                         payload = layers.get("data.data", [""])[0]
+
+                        arp_src_ip = layers.get("arp.src.proto_ipv4", [None])[0]
+                        arp_src_mac = layers.get("arp.src.hw_mac", [None])[0]
+                        if arp_src_ip and arp_src_mac:
+                            check_arp(arp_src_ip, arp_src_mac)
+                            continue
 
                         raw_bytes = bytes.fromhex(payload) if payload else b""
                         modbus_info = parse_modbus_packet(raw_bytes)

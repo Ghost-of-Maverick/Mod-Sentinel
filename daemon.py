@@ -79,7 +79,7 @@ def daemon_loop():
                             f"{parsed_packet['IP']['dst']}:{parsed_packet['TCP']['dport']} | FC: {parsed_packet['function_code']}"
                         )
                     log_event(parsed_packet, parsed_packet, status, rule)
-                    log_to_csv(parsed_packet, parsed_packet)
+                    log_to_csv(parsed_packet, parsed_packet, status)
 
             except Exception as e:
                 logger.exception(f"Erro ao processar pacote: {e}")
@@ -94,7 +94,7 @@ def daemon_loop():
                 if verbose_mode:
                     logger.info(f"[VERBOSE][TEST MODE] Pacote gerado: FC: {modbus_data['function_code']}")
                 log_event(fake_packet, modbus_data, status, rule)
-                log_to_csv(fake_packet, modbus_data)
+                log_to_csv(fake_packet, modbus_data, status)
                 last_test_log = time.time()
 
             time.sleep(0.1)

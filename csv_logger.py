@@ -10,9 +10,18 @@ def set_csv_file(file_path):
     os.makedirs(os.path.dirname(csv_file), exist_ok=True)
     with open(csv_file, mode="w", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(["timestamp", "src_ip", "src_port", "dst_ip", "dst_port", "function_code", "payload"])
+        writer.writerow([
+            "timestamp",
+            "src_ip",
+            "src_port",
+            "dst_ip",
+            "dst_port",
+            "function_code",
+            "payload",
+            "malicious",
+        ])
 
-def log_to_csv(packet, data):
+def log_to_csv(packet, data, status):
     if not csv_file:
         return  # CSV ainda não definido
 
@@ -22,11 +31,17 @@ def log_to_csv(packet, data):
     dst_port = packet["TCP"]["dport"]
     function_code = data.get("function_code", "?")
     payload = data.get("payload", "")
+    malicious = 1 if status == "Malicious" else 0
 
     with open(csv_file, mode="a", newline="") as f:
         writer = csv.writer(f)
         writer.writerow([
             datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            src_ip, src_port, dst_ip, dst_port,
-            function_code, payload
+            src_ip,
+            src_port,
+            dst_ip,
+            dst_port,
+            function_code,
+            payload,
+            malicious,
         ])
