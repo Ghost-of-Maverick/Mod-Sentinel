@@ -1,4 +1,4 @@
-interface: eth1
+interface: eth2
 verbose_mode: true
 test_mode: false
 test_interval: 50

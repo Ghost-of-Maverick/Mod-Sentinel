@@ -4,12 +4,15 @@ import yaml
 import threading
 from datetime import datetime
 from packet_capture import start_tshark_capture, stop_tshark_capture
-from tshark_parser import tshark_packet_queue
+from tshark_parser import tshark_packet_queue, start_tshark_parser
 from detector import init_detector, detect
 from logger import log_event
 from csv_logger import log_to_csv, set_csv_file
 from utils import write_pid, remove_pid, check_pid
 from app_logger import logger
+
+# Notas:
+#  - onde vou colocar a funcao do csv? vale a pena? ou cria-se o csv com base na captura do tshark?
 
 TIMESTAMP = datetime.now().strftime('%Y%m%d_%H%M%S')
 PCAP_FULL = f"logs/captura_completa_{TIMESTAMP}.pcap"
