@@ -7,7 +7,7 @@ from packet_capture import start_tshark_capture, stop_tshark_capture
 from tshark_parser import tshark_packet_queue, start_tshark_parser
 from detector import init_detector, detect
 from logger import log_event
-from csv_logger import log_to_csv, set_csv_file
+from csv_logger import log_to_csv, set_csv_file, close_csv_file
 from utils import write_pid, remove_pid, check_pid
 from app_logger import logger
 
@@ -79,7 +79,7 @@ def daemon_loop():
                             f"{parsed_packet['IP']['dst']}:{parsed_packet['TCP']['dport']} | FC: {parsed_packet['function_code']}"
                         )
                     log_event(parsed_packet, parsed_packet, status, rule)
-                    log_to_csv(parsed_packet, parsed_packet)
+                    log_to_csv(parsed_packet, parsed_packet, status)
 
             except Exception as e:
                 logger.exception(f"Erro ao processar pacote: {e}")
@@ -94,13 +94,14 @@ def daemon_loop():
                 if verbose_mode:
                     logger.info(f"[VERBOSE][TEST MODE] Pacote gerado: FC: {modbus_data['function_code']}")
                 log_event(fake_packet, modbus_data, status, rule)
-                log_to_csv(fake_packet, modbus_data)
+                log_to_csv(fake_packet, modbus_data, status)
                 last_test_log = time.time()
 
             time.sleep(0.1)
     finally:
         stop_tshark_capture(full_proc, modbus_proc)
         logger.info("Captura tshark terminada.")
+        close_csv_file()
 
 def start_daemon():
     if check_pid():
