@@ -10,3 +10,8 @@ MODBUS_SERVER:
   - 172.27.224.250
 
 rules_file: rules/modsentinel.rules
+
+# Lista de pares IP-MAC permitidos para deteção de ARP spoofing
+allowed_macs:
+  "172.27.224.10": "00:11:22:33:44:55"
+  "172.27.224.250": "66:77:88:99:AA:BB"
