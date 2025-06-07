@@ -22,16 +22,6 @@ def load_config():
     with open(CONFIG_FILE, 'r') as file:
         return yaml.safe_load(file)
 
-def generate_test_packet():
-    return {
-        "transaction_id": 0,
-        "protocol_id": 0,
-        "length": 6,
-        "unit_id": 1,
-        "function_code": 99,
-        "payload": "63deadbeef"
-    }
-
 def daemon_loop():
     config = load_config()
 
@@ -49,41 +39,9 @@ def daemon_loop():
 
     try:
         while True:
-<<<<<<< HEAD
             time.sleep(1)  # Mantém daemon ativo
     except KeyboardInterrupt:
         logger.info("ModSentinel interrompido pelo utilizador.")
-=======
-            try:
-                if not tshark_packet_queue.empty():
-                    parsed_packet = tshark_packet_queue.get()
-                    status, rule = detect(parsed_packet)
-                    if verbose_mode:
-                        logger.info(
-                            f"[VERBOSE] Modbus: {parsed_packet['IP']['src']}:{parsed_packet['TCP']['sport']} → "
-                            f"{parsed_packet['IP']['dst']}:{parsed_packet['TCP']['dport']} | FC: {parsed_packet['function_code']}"
-                        )
-                    log_event(parsed_packet, parsed_packet, status, rule)
-                    log_to_csv(parsed_packet, parsed_packet, status)
-
-            except Exception as e:
-                logger.exception(f"Erro ao processar pacote: {e}")
-
-            if test_mode and (time.time() - last_test_log >= test_interval):
-                modbus_data = generate_test_packet()
-                status, rule = detect(modbus_data)
-                fake_packet = {
-                    'IP': {'src': '192.0.2.1', 'dst': '192.0.2.2'},
-                    'TCP': {'sport': 12345, 'dport': 502}
-                }
-                if verbose_mode:
-                    logger.info(f"[VERBOSE][TEST MODE] Pacote gerado: FC: {modbus_data['function_code']}")
-                log_event(fake_packet, modbus_data, status, rule)
-                log_to_csv(fake_packet, modbus_data, status)
-                last_test_log = time.time()
-
-            time.sleep(0.1)
->>>>>>> 457c16413991943058053aa60c6b336b5f9d0719
     finally:
         logger.info("ModSentinel terminado.")
 

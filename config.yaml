@@ -1,8 +1,5 @@
 interface: eth2
 
-test_mode: false
-test_interval: 50
-
 MODBUS_CLIENT:
   - 172.27.224.10
 

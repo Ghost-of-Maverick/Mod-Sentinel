@@ -1,5 +1,5 @@
 import csv
-import os 
+import os
 
 csv_file = None
 csv_writer = None
@@ -30,21 +30,32 @@ def set_csv_file(path):
     if is_empty:
         csv_writer.writeheader()
 
-def log_to_csv(packet, data):
-    if not csv_file:
-        return  # CSV ainda não definido
+def log_to_csv(packet, raw_data=None, status=0):
+    if csv_writer is None:
+        return
 
-    src_ip = packet["IP"]["src"]
-    dst_ip = packet["IP"]["dst"]
-    src_port = packet["TCP"]["sport"]
-    dst_port = packet["TCP"]["dport"]
-    function_code = data.get("function_code", "?")
-    payload = data.get("payload", "")
+    try:
+        row = {
+            'timestamp': packet.get('timestamp', ''),
+            'src_mac': packet.get('src_mac', ''),
+            'dst_mac': packet.get('dst_mac', ''),
+            'src_ip': packet.get('src_ip', ''),
+            'src_port': packet.get('src_port', ''),
+            'dst_ip': packet.get('dst_ip', ''),
+            'dst_port': packet.get('dst_port', ''),
+            'function_code': packet.get('function_code', ''),
+            'flags': packet.get('flags', ''),
+            'length': packet.get('length', ''),
+            'transaction_id': packet.get('transaction_id', ''),
+            'payload': packet.get('payload', ''),
+            'malicious': int(bool(status))  # Converte corretamente para 0 ou 1
+        }
 
-    with open(csv_file, mode="a", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow([
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            src_ip, src_port, dst_ip, dst_port,
-            function_code, payload
-        ])
+        csv_writer.writerow(row)
+        csv_file.flush()
+    except Exception as e:
+        print(f"[csv_logger] Erro ao escrever linha no CSV: {e}")
+
+def close_csv_file():
+    if csv_file:
+        csv_file.close()

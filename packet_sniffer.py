@@ -41,7 +41,7 @@ def packet_sniffer(interface):
                 }
 
                 status, rule = detect(parsed)
-                parsed['malicious'] = int(bool(status))
+                parsed['malicious'] = int(bool(status))  # Garante valor 0 ou 1
 
                 log_to_csv(parsed, parsed, status)
                 log_event(parsed, parsed, status, rule)
