@@ -54,27 +54,25 @@ Comandos disponíveis:
   stop                  → Encerra o processo ModSentinel se estiver em execução
   restart               → Reinicia o ModSentinel (stop seguido de start)
   status                → Mostra o estado atual do serviço (em execução ou parado)
-  logs [--n N]          → Mostra os últimos N registos do log da aplicação (default: 10)
-  detections [--n N]    → Mostra os últimos N eventos de deteção (modsentinel.log)
   help                  → Mostra esta ajuda
 
 Configuração:
   A configuração principal encontra-se no ficheiro config.yaml, onde podes definir:
     - interface: interface de rede a escutar (ex: eth0)
-    - verbose_mode: true/false → imprime pacotes Modbus detetados no log
     - test_mode: true/false → ativa geração automática de pacotes falsos
     - test_interval: intervalo em segundos para pacotes de teste
-    - app_log_level: nível de logging do sistema (DEBUG, INFO, WARNING, ERROR)
 
 Logs:
-  logs/app.log         → Eventos da aplicação, erros, arranque/paragem
-  logs/modsentinel.log    → Eventos de deteção de pacotes Modbus
-
+  logs/app.log             → Eventos da aplicação, erros, arranque/paragem
+  logs/modsentinel*.log    → Eventos de deteção de pacotes Modbus
+  logs/trafego.csv         → Registo de tráfego Modbus/TCP em formato CSV
+  logs/captura.pcap        → Ficheiro de captura de tráfego completo
+  logs/captura_modbus.pcap → Ficheiro de captura de tráfego Modbus/TCP  
+  
 Exemplos:
   python main.py start
   python main.py status
-  python main.py logs --n 20
-  python main.py detections --n 5
+  python main.py restart
 """)
 
 if __name__ == "__main__":

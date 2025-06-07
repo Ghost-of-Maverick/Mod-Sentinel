@@ -3,20 +3,15 @@ import time
 import yaml
 import threading
 from datetime import datetime
-from packet_capture import start_tshark_capture, stop_tshark_capture
-from tshark_parser import tshark_packet_queue, start_tshark_parser
+from packet_sniffer import start_sniffer_thread
 from detector import init_detector, detect
 from logger import log_event
-from csv_logger import log_to_csv, set_csv_file, close_csv_file
 from utils import write_pid, remove_pid, check_pid
 from app_logger import logger
-
-# Notas:
-#  - onde vou colocar a funcao do csv? vale a pena? ou cria-se o csv com base na captura do tshark?
+from queue import Empty, Queue
 
 TIMESTAMP = datetime.now().strftime('%Y%m%d_%H%M%S')
 PCAP_FULL = f"logs/captura_completa_{TIMESTAMP}.pcap"
-PCAP_MODBUS = f"logs/captura_modbus_{TIMESTAMP}.pcap"
 CSV_FILE = f"logs/trafego_{TIMESTAMP}.csv"
 
 os.makedirs("logs", exist_ok=True)
@@ -41,34 +36,24 @@ def daemon_loop():
     config = load_config()
 
     rules_file = config.get("rules_file", "rules/modsentinel.rules")
-    init_detector(rules_file)
-
-    interface = config.get('interface', 'eth0')
-    verbose_mode = config.get('verbose_mode', False)
-    test_mode = config.get('test_mode', False)
-    test_interval = config.get('test_interval', 5)
+    interface = config.get("interface", "eth0")
 
     logger.info("ModSentinel iniciado.")
     logger.info(f"Interface configurada: {interface}")
-    if test_mode:
-        logger.info("Modo de teste ativo.")
-    if verbose_mode:
-        logger.info("Modo verbose ativo.")
 
-    # Define o ficheiro CSV e inicia o parser tshark
-    set_csv_file(CSV_FILE)
-    start_tshark_parser()
+    # Inicializa regras de deteção
+    init_detector(rules_file)
 
-    # Inicia captura tshark
-    full_proc, modbus_proc = start_tshark_capture(interface, PCAP_FULL, PCAP_MODBUS)
-
-    if full_proc and modbus_proc:
-        logger.info("Captura com tshark iniciada.")
-
-    last_test_log = time.time()
+    # Inicia sniffer em thread
+    start_sniffer_thread(interface)
 
     try:
         while True:
+<<<<<<< HEAD
+            time.sleep(1)  # Mantém daemon ativo
+    except KeyboardInterrupt:
+        logger.info("ModSentinel interrompido pelo utilizador.")
+=======
             try:
                 if not tshark_packet_queue.empty():
                     parsed_packet = tshark_packet_queue.get()
@@ -98,10 +83,9 @@ def daemon_loop():
                 last_test_log = time.time()
 
             time.sleep(0.1)
+>>>>>>> 457c16413991943058053aa60c6b336b5f9d0719
     finally:
-        stop_tshark_capture(full_proc, modbus_proc)
-        logger.info("Captura tshark terminada.")
-        close_csv_file()
+        logger.info("ModSentinel terminado.")
 
 def start_daemon():
     if check_pid():
