@@ -20,12 +20,14 @@ def set_csv_file(path):
         'dst_ip',
         'dst_port',
         'function_code',
+        'unit_id',
         'flags',
         'length',
         'transaction_id',
         'payload',
         'malicious'
     ])
+
 
     if is_empty:
         csv_writer.writeheader()
@@ -44,11 +46,12 @@ def log_to_csv(packet, raw_data=None, status=0):
             'dst_ip': packet.get('dst_ip', ''),
             'dst_port': packet.get('dst_port', ''),
             'function_code': packet.get('function_code', ''),
+            'unit_id': packet.get('unit_id', ''),
             'flags': packet.get('flags', ''),
             'length': packet.get('length', ''),
             'transaction_id': packet.get('transaction_id', ''),
             'payload': packet.get('payload', ''),
-            'malicious': int(bool(status))  # Converte corretamente para 0 ou 1
+            'malicious': int(bool(status))
         }
 
         csv_writer.writerow(row)

@@ -19,17 +19,20 @@ def log_event(packet, data, status, rule):
         src_mac = packet.get('src_mac', 'N/A')
         dst_mac = packet.get('dst_mac', 'N/A')
         function_code = packet.get('function_code', '?')
+        unit_id = packet.get('unit_id', '')
         flags = packet.get('flags', '')
         length = packet.get('length', '')
         transaction_id = packet.get('transaction_id', '')
         payload = packet.get('payload', '')
-        payload_short = payload[:32] + "..." if len(payload) > 32 else payload
+        malicious = packet.get('malicious', 0)
+
+        payload_str = str(payload)
 
         log_msg = (
-            f"[{timestamp}] STATUS: {status}\n"
+            f"[{timestamp}] STATUS: {status} | MALICIOUS: {malicious}\n"
             f"→ From: {src_ip}:{src_port} ({src_mac}) → To: {dst_ip}:{dst_port} ({dst_mac})\n"
-            f"→ Function Code: {function_code} | Flags: {flags} | Length: {length} | TxID: {transaction_id}\n"
-            f"→ Payload: {payload_short}\n"
+            f"→ Function Code: {function_code} | Unit ID: {unit_id} | Flags: {flags} | Length: {length} | Transation ID: {transaction_id}\n"
+            f"→ Data: {payload}\n"
         )
 
         if rule:
@@ -41,3 +44,4 @@ def log_event(packet, data, status, rule):
     except Exception as e:
         with open(LOG_FILE, 'a') as f:
             f.write(f"[LOG ERROR] Erro ao processar pacote: {e}\n")
+

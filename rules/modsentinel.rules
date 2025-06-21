@@ -4,13 +4,6 @@
 #   MODBUS_CLIENT
 #   MODBUS_SERVER
 
-# Regra de teste
-alert tcp any any -> any 502 (
-    content:"|63|"; offset:0; depth:4;
-    msg:"[TESTE] Pacote artificial com FC 99";
-    sid:999999; priority:0;
-)
-
 # Regras Modbus TCP
 alert tcp $MODBUS_CLIENT any -> $MODBUS_SERVER 502 (
     content:"|08 00 04|"; offset:7; depth:3;
@@ -34,62 +27,6 @@ alert tcp $MODBUS_CLIENT any -> $MODBUS_SERVER 502 (
     content:"|2B|"; offset:7; depth:1;
     msg:"SCADA_IDS: Modbus TCP - Read Device Identification";
     sid:1111004; priority:3;
-)
-
-alert tcp $MODBUS_CLIENT any -> $MODBUS_SERVER 502 (
-    content:"|11|"; offset:7; depth:1;
-    msg:"SCADA_IDS: Modbus TCP - Report Server Information";
-    sid:1111005; priority:3;
-)
-
-alert tcp !$MODBUS_CLIENT any -> $MODBUS_SERVER 502 (
-    content:"|00 00|"; offset:2; depth:2;
-    msg:"SCADA_IDS: Unauthorized Read Request to a PLC";
-    sid:1111006; priority:2;
-)
-
-alert tcp !$MODBUS_CLIENT any -> $MODBUS_SERVER 502 (
-    content:"|00 00|"; offset:2; depth:2;
-    msg:"SCADA_IDS: Unauthorized Write Request to a PLC";
-    sid:1111007; priority:1;
-)
-
-alert tcp $MODBUS_CLIENT any <> $MODBUS_SERVER 502 (
-    msg:"SCADA_IDS: Modbus TCP - Illegal Packet Size, Possible DOS Attack";
-    sid:1111008; priority:1;
-)
-
-alert tcp $MODBUS_CLIENT any <> $MODBUS_SERVER 502 (
-    msg:"SCADA_IDS: Modbus TCP - Non-Modbus Communication on TCP Port 502";
-    sid:1111009; priority:1;
-)
-
-alert tcp $MODBUS_SERVER 502 -> $MODBUS_CLIENT any (
-    content:"|00 00|"; offset:2; depth:2;
-    content:"|06|"; offset:8; depth:1;
-    msg:"SCADA_IDS: Slave Device Busy Exception Code Delay";
-    sid:1111010; priority:2;
-)
-
-alert tcp $MODBUS_SERVER 502 -> $MODBUS_CLIENT any (
-    content:"|00 00|"; offset:2; depth:2;
-    content:"|05|"; offset:8; depth:1;
-    msg:"SCADA_IDS: Acknowledge Exception Code Delay";
-    sid:1111011; priority:2;
-)
-
-alert tcp $MODBUS_SERVER 502 -> $MODBUS_CLIENT any (
-    content:"|00 00|"; offset:2; depth:2;
-    content:"|02|"; offset:8; depth:1;
-    msg:"SCADA_IDS: Points List Scan";
-    sid:1111013; priority:2;
-)
-
-alert tcp $MODBUS_SERVER 502 -> $MODBUS_CLIENT any (
-    content:"|00 00|"; offset:2; depth:2;
-    content:"|01|"; offset:8; depth:1;
-    msg:"SCADA_IDS: Function Code Scan";
-    sid:1111014; priority:2;
 )
 
 # Regras Modicon Ladder Logic
