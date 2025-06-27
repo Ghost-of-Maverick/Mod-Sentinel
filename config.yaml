@@ -10,5 +10,7 @@ rules_file: rules/modsentinel.rules
 
 # Lista de pares IP-MAC permitidos para deteção de ARP spoofing
 allowed_macs:
-  "172.27.224.10": "00:11:22:33:44:55"
-  "172.27.224.250": "66:77:88:99:AA:BB"
+  "172.27.224.10": "00:80:f4:09:51:3b" # HMI
+  "172.27.224.250": "00:0c:29:4d:dc:22" # PLC 1
+  "172.27.224.251": "00:0c:29:4d:dc:23" # PLC 2
+

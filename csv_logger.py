@@ -21,13 +21,13 @@ def set_csv_file(path):
         'dst_port',
         'function_code',
         'unit_id',
+        'protocol_id',  
         'flags',
         'length',
         'transaction_id',
         'payload',
         'malicious'
     ])
-
 
     if is_empty:
         csv_writer.writeheader()
@@ -47,6 +47,7 @@ def log_to_csv(packet, raw_data=None, status=0):
             'dst_port': packet.get('dst_port', ''),
             'function_code': packet.get('function_code', ''),
             'unit_id': packet.get('unit_id', ''),
+            'protocol_id': packet.get('protocol_id', ''),  
             'flags': packet.get('flags', ''),
             'length': packet.get('length', ''),
             'transaction_id': packet.get('transaction_id', ''),

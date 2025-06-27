@@ -49,6 +49,16 @@ def extrair_data_bytes(packet):
         logger.debug(f"Erro a extrair data bytes: {e}")
     return ''
 
+def extrair_protocol_id_raw(packet):
+    try:
+        raw = bytes.fromhex(packet.tcp.payload.replace(':', ''))
+        if len(raw) >= 4:
+            protocol_id = int.from_bytes(raw[2:4], byteorder='big')  # Byte 3 e 4
+            return str(protocol_id)
+    except Exception as e:
+        logger.debug(f"Erro a extrair protocol_id raw: {e}")
+    return ''
+
 def packet_sniffer(interface):
     logger.info("A iniciar captura e análise com pyshark...")
 
@@ -58,9 +68,10 @@ def packet_sniffer(interface):
         for packet in capture.sniff_continuously():
             try:
                 transaction_id = ''
-                payload = ''
-                function_code = ''
+                protocol_id = ''
                 unit_id = ''
+                function_code = ''
+                payload = ''
 
                 if 'modbus' in packet:
                     modbus_layer = packet.modbus
@@ -72,6 +83,7 @@ def packet_sniffer(interface):
                     transaction_id = extrair_transaction_id_raw(packet)
                 if not unit_id:
                     unit_id = extrair_unit_id_raw(packet)
+                protocol_id = extrair_protocol_id_raw(packet)
                 payload = extrair_data_bytes(packet)
 
                 parsed = {
@@ -84,6 +96,7 @@ def packet_sniffer(interface):
                     'dst_port': packet.tcp.dstport if hasattr(packet, 'tcp') else '',
                     'function_code': function_code,
                     'unit_id': unit_id,
+                    'protocol_id': protocol_id,
                     'flags': packet.tcp.flags if hasattr(packet, 'tcp') else '',
                     'length': packet.length,
                     'transaction_id': transaction_id,
