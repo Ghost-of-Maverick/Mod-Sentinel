@@ -1,50 +1,32 @@
-# Regras Modbus e Modicon baseadas nas regras do Snort
-
 # Variáveis esperadas no config.yaml:
 #   MODBUS_CLIENT
 #   MODBUS_SERVER
 
 # Regras Modbus TCP
-alert tcp $MODBUS_CLIENT any -> $MODBUS_SERVER 502 (
-    content:"|08 00 04|"; offset:7; depth:3;
-    msg:"SCADA_IDS: Modbus TCP - Force Listen Only Mode";
-    sid:1111001; priority:1;
-)
+alert tcp $MODBUS_CLIENT any -> $MODBUS_SERVER 502 (flow:from_client,established; content:"|00 00|"; offset:2; depth:2; content:"|08 00 04|"; offset:7; depth:3; msg:"SCADA_IDS: Modbus TCP - Force Listen Only Mode"; reference:url,digitalbond.com/tools/quickdraw/modbus-tcp-rules; classtype:attempted-dos; sid:1111001; rev:2; priority:1;)
 
-alert tcp $MODBUS_CLIENT any -> $MODBUS_SERVER 502 (
-    content:"|08 00 01|"; offset:7; depth:3;
-    msg:"SCADA_IDS: Modbus TCP - Restart Communications Option";
-    sid:1111002; priority:1;
-)
+alert tcp $MODBUS_CLIENT any -> $MODBUS_SERVER 502 (flow:from_client,established; content:"|00 00|"; offset:2; depth:2; content:"|08 00 01|"; offset:7; depth:3; msg:"SCADA_IDS: Modbus TCP - Restart Communications Option"; reference:url,digitalbond.com/tools/quickdraw/modbus-tcp-rules; classtype:attempted-dos; sid:1111002; rev:2; priority:1;)
 
-alert tcp $MODBUS_CLIENT any -> $MODBUS_SERVER 502 (
-    content:"|08 00 0A|"; offset:7; depth:3;
-    msg:"SCADA_IDS: Modbus TCP - Clear Counters and Diagnostic Registers";
-    sid:1111003; priority:3;
-)
+alert tcp $MODBUS_CLIENT any -> $MODBUS_SERVER 502 (flow:from_client,established; content:"|00 00|"; offset:2; depth:2; content:"|08 00 0A|"; offset:7; depth:3; msg:"SCADA_IDS: Modbus TCP - Clear Counters and Diagnostic Registers"; reference:url,digitalbond.com/tools/quickdraw/modbus-tcp-rules; classtype:misc-attack; sid:1111003; rev:2; priority:3;)
 
-alert tcp $MODBUS_CLIENT any -> $MODBUS_SERVER 502 (
-    content:"|2B|"; offset:7; depth:1;
-    msg:"SCADA_IDS: Modbus TCP - Read Device Identification";
-    sid:1111004; priority:3;
-)
+alert tcp $MODBUS_CLIENT any -> $MODBUS_SERVER 502 (flow:from_client,established; content:"|00 00|"; offset:2; depth:2; content:"|2B|"; offset:7; depth:1; msg:"SCADA_IDS: Modbus TCP - Read Device Identification"; reference:url,digitalbond.com/tools/quickdraw/modbus-tcp-rules; classtype:attempted-recon; sid:1111004; rev:2; priority:3;)
 
-# Regras Modicon Ladder Logic
-alert tcp any any -> any 502 (
-    content:"|00 5a 01 34 00 01|";
-    msg:"Schneider Modicon - Download Ladder Logic Started";
-    sid:1111015; priority:2;
-)
+alert tcp $MODBUS_CLIENT any -> $MODBUS_SERVER 502 (flow:from_client,established; content:"|00 00|"; offset:2; depth:2; content:"|11|"; offset:7; depth:1; msg:"SCADA_IDS: Modbus TCP - Report Server Information"; reference:url,digitalbond.com/tools/quickdraw/modbus-tcp-rules; classtype:attempted-recon; sid:1111005; rev:2; priority:3;)
 
-alert udp any any -> any 502 (
-    content:"|00 5a 00 58 02 01 00 00 00 00 00 fb 00|";
-    msg:"Schneider Modicon - Upload Ladder Logic Started";
-    sid:1111016; priority:2;
-)
+alert tcp !$MODBUS_CLIENT any -> $MODBUS_SERVER 502 (flow:from_client,established; content:"|00 00|"; offset:2; depth:2; pcre:"/[\S\s]{3}(\x01|\x02|\x03|\x04|\x07|\x0B|\x0C|\x11|\x14|\x17|\x18|\x2B)/iAR"; msg:"SCADA_IDS: Modbus TCP - Unauthorized Read Request to a PLC"; reference:url,digitalbond.com/tools/quickdraw/modbus-tcp-rules; classtype:bad-unknown; sid:1111006; rev:1; priority:2;)
 
-alert udp !$MODICON_CLIENT any -> any 502 (
-    content:"|00 5a 00 58 02 01 00 00 00 00 00 fb 00|";
-    msg:"Schneider Modicon - Unauthorized Ladder Logic Upload";
-    sid:1111017; priority:1;
-)
+alert tcp !$MODBUS_CLIENT any -> $MODBUS_SERVER 502 (flow:from_client,established; content:"|00 00|"; offset:2; depth:2; pcre:"/[\S\s]{3}(\x05|\x06|\x0F|\x10|\x15|\x16)/iAR"; msg:"SCADA_IDS: Modbus TCP - Unauthorized Write Request to a PLC"; reference:url,digitalbond.com/tools/quickdraw/modbus-tcp-rules; classtype:bad-unknown; sid:1111007; rev:1; priority:1;)
 
+alert tcp $MODBUS_CLIENT any <> $MODBUS_SERVER 502 (flow:established; dsize:>300; msg:"SCADA_IDS: Modbus TCP - Illegal Packet Size, Possible DOS Attack"; reference:url,digitalbond.com/tools/quickdraw/modbus-tcp-rules; classtype:non-standard-protocol; sid:1111008; rev:1; priority:1;)
+
+alert tcp $MODBUS_CLIENT any <> $MODBUS_SERVER 502 (flow:established; pcre:"/[\S\s]{2}(?!\x00\x00)/iAR"; msg:"SCADA_IDS: Modbus TCP - Non-Modbus Communication on TCP Port 502"; reference:url,digitalbond.com/tools/quickdraw/modbus-tcp-rules; classtype:non-standard-protocol; sid:1111009; rev:1; priority:1;) 
+
+alert tcp $MODBUS_SERVER 502 -> $MODBUS_CLIENT any (flow:established; content:"|00 00|"; offset:2; depth:2; content:"|06|"; offset:8; depth:1; byte_test: 1, >=, 0x80, 7; msg:"SCADA_IDS: Modbus TCP - Slave Device Busy Exception Code Delay"; threshold: type threshold, track by_src, count 3, seconds 60; reference:url,digitalbond.com/tools/quickdraw/modbus-tcp-rules; classtype:successful-dos; sid:1111010; rev:2; priority:2;)
+
+alert tcp $MODBUS_SERVER 502 -> $MODBUS_CLIENT any (flow:established; content:"|00 00|"; offset:2; depth:2; content:"|05|"; offset:8; depth:1; byte_test: 1, >=, 0x80, 7; msg:"SCADA_IDS: Modbus TCP - Acknowledge Exception Code Delay"; threshold: type threshold, track by_src, count 3, seconds 60; reference:url,digitalbond.com/tools/quickdraw/modbus-tcp-rules; classtype:successful-dos; sid:1111011; rev:2; priority:2;)
+
+alert tcp $MODBUS_SERVER 502 <> $MODBUS_CLIENT any (flow:established; byte_jump:2,4; isdataat:0,relative; msg:"SCADA_IDS: Modbus TCP - Incorrect Packet Length, Possible DOS Attack"; reference:url,digitalbond.com/tools/quickdraw/modbus-tcp-rules; classtype:non-standard-protocol; sid:1111012; rev:1; priority:2;)
+
+alert tcp $MODBUS_SERVER 502 -> $MODBUS_CLIENT any (flow:established; content:"|00 00|"; offset:2; depth:2; byte_test: 1, >=, 0x80, 7; content:"|02|"; offset:8; depth:1; msg:"SCADA_IDS: Modbus TCP - Points List Scan"; threshold: type threshold, track by_src, count 5, seconds 60; reference:url,digitalbond.com/tools/quickdraw/modbus-tcp-rules; classtype:attempted-recon; sid:1111013; rev:2; priority:2;)
+
+alert tcp $MODBUS_SERVER 502 -> $MODBUS_CLIENT any (flow:established; content:"|00 00|"; offset:2; depth:2; byte_test: 1, >=, 0x80, 7; content:"|01|"; offset:8; depth:1; msg:"SCADA_IDS: Modbus TCP - Function Code Scan"; threshold: type threshold, track by_src, count 3, seconds 60; reference:url,digitalbond.com/tools/quickdraw/modbus-tcp-rules; classtype:attempted-recon; sid:1111014; rev:2; priority:2;)

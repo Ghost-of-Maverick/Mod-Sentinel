@@ -41,7 +41,8 @@ def parse_rule(rule_text, client_ips, server_ips):
         header = header.replace("$MODBUS_CLIENT", "|MODBUS_CLIENT|")
         header = header.replace("$MODBUS_SERVER", "|MODBUS_SERVER|")
 
-        proto, src, src_port, direction, dst, dst_port = header.split()[1:7]
+        parts = header.split()
+        proto, src, src_port, direction, dst, dst_port = parts[1:7]
 
         return {
             "proto": proto,
@@ -65,21 +66,50 @@ def parse_options(options_str):
 
     while i < len(parts):
         part = parts[i]
+
+        # Content com offset e depth
         if part.startswith("content:"):
             content_val = part.split(":", 1)[1].strip().strip('"')
             entry = {"content": content_val}
-            # Verifica se os próximos são offset/depth
+
             if i + 1 < len(parts) and parts[i + 1].startswith("offset:"):
                 entry["offset"] = parts[i + 1].split(":", 1)[1].strip()
                 i += 1
             if i + 1 < len(parts) and parts[i + 1].startswith("depth:"):
                 entry["depth"] = parts[i + 1].split(":", 1)[1].strip()
                 i += 1
+
             contents.append(entry)
+
+        # byte_test tratado como dict
+        elif part.startswith("byte_test:"):
+            bt_val = part.split(":", 1)[1].strip()
+            bt_parts = [x.strip() for x in bt_val.split(",")]
+            options["byte_test"] = {
+                "size": bt_parts[0],
+                "operator": bt_parts[1],
+                "value": bt_parts[2],
+                "offset": bt_parts[3]
+            }
+
+        # pcre tratado isoladamente
+        elif part.startswith("pcre:"):
+            options["pcre"] = part.split(":", 1)[1].strip().strip('"')
+
+        # dsize
+        elif part.startswith("dsize:"):
+            options["dsize"] = part.split(":", 1)[1].strip()
+
+        # flow
+        elif part.startswith("flow:"):
+            options["flow"] = part.split(":", 1)[1].strip()
+
+        # Outros campos (msg, sid, etc.)
         else:
             if ":" in part:
                 key, value = part.split(":", 1)
                 options[key.strip()] = value.strip().strip('"')
+
         i += 1
 
     if contents:
