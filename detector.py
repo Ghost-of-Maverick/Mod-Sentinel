@@ -16,7 +16,7 @@ def init_detector(rules_file):
 
 def detect(modbus_data):
     if not modbus_data or "payload" not in modbus_data:
-        return 0, None  # Nada suspeito
+        return 0, None
 
     # Verifica ARP spoofing
     src_ip = modbus_data.get("src_ip")
@@ -24,7 +24,7 @@ def detect(modbus_data):
     if src_ip and src_mac:
         expected_mac = ALLOWED_MACS.get(src_ip)
         if expected_mac and expected_mac.lower() != src_mac.lower():
-            return 1, f"[MITM] ARP Spoofing detected! IP {src_ip} should be {expected_mac}, got {src_mac}"
+            return 1, f"[MITM] ARP Spoofing detected! IP {src_ip} deveria ser {expected_mac}, recebeu {src_mac}"
 
     payload_bytes = bytes.fromhex(modbus_data["payload"])
     dst_ip = modbus_data.get("dst_ip")
@@ -42,25 +42,22 @@ def detect(modbus_data):
             if not is_response_consistent(last_request, modbus_data):
                 return 1, "[MITM] Resposta incoerente com o pedido anterior"
 
-    # Verificação baseada em regras
     for rule in rules:
         opts = rule["options"]
         all_match = True
 
-        # Verifica flow (direção do tráfego)
         flow = opts.get("flow")
         if flow:
-            is_client_to_server = modbus_data.get("dst_port") == 502
-            is_server_to_client = modbus_data.get("src_port") == 502
+            is_c2s = modbus_data.get("dst_port") == 502
+            is_s2c = modbus_data.get("src_port") == 502
 
-            if "from_client" in flow and not is_client_to_server:
+            if "from_client" in flow and not is_c2s:
                 continue
-            if "to_client" in flow and not is_server_to_client:
+            if "to_client" in flow and not is_s2c:
                 continue
-            if "established" in flow and not (is_client_to_server or is_server_to_client):
+            if "established" in flow and not (is_c2s or is_s2c):
                 continue
 
-        # Verifica dsize
         if "dsize" in opts:
             dsize = opts["dsize"]
             if ">" in dsize:
@@ -72,7 +69,6 @@ def detect(modbus_data):
                 if len(payload_bytes) != expected_size:
                     all_match = False
 
-        # Verifica contents
         if "contents" in opts:
             for c in opts["contents"]:
                 try:
@@ -90,7 +86,6 @@ def detect(modbus_data):
                     all_match = False
                     break
 
-        # Verifica pcre
         if "pcre" in opts:
             import re
             pcre = opts["pcre"]
@@ -99,7 +94,6 @@ def detect(modbus_data):
             if not pattern.search(payload_bytes):
                 all_match = False
 
-        # Verifica byte_test
         if "byte_test" in opts:
             try:
                 bt = opts["byte_test"]
@@ -117,12 +111,41 @@ def detect(modbus_data):
             except Exception:
                 all_match = False
 
+        if "byte_jump" in opts:
+            try:
+                jump_size = int(opts["byte_jump"]["size"])
+                jump_offset = int(opts["byte_jump"]["offset"])
+                relative = opts["byte_jump"].get("relative", False)
+                jump_value = int.from_bytes(payload_bytes[jump_offset:jump_offset + jump_size], byteorder="big")
+
+                if relative:
+                    index = jump_offset + jump_size + jump_value
+                else:
+                    index = jump_value
+
+                if index >= len(payload_bytes):
+                    all_match = False
+            except Exception:
+                all_match = False
+
+        if "isdataat" in opts:
+            try:
+                index = int(opts["isdataat"]["index"])
+                relative = opts["isdataat"].get("relative", False)
+                if relative:
+                    if index >= len(payload_bytes):
+                        all_match = False
+                else:
+                    if index >= len(payload_bytes):
+                        all_match = False
+            except Exception:
+                all_match = False
+
         if all_match:
             msg = opts.get("msg", "[Regra sem mensagem]")
             sid = opts.get("sid", "N/A")
             return 1, f"[SID {sid}] {msg}"
 
-    # Nenhuma regra bateu
     return 0, None
 
 def is_response_consistent(request, response):
@@ -132,7 +155,6 @@ def is_response_consistent(request, response):
     req_payload = bytes.fromhex(request["payload"])
     res_payload = bytes.fromhex(response["payload"])
 
-    # Exemplo de verificação para FC=3 (Read Holding Registers)
     if response["function_code"] == 3:
         if len(req_payload) >= 6 and len(res_payload) >= 3:
             expected_registers = req_payload[5]
