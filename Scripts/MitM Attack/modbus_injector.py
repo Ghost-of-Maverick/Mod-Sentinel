@@ -14,11 +14,11 @@ PLC2_IP = "172.27.224.251"
 
 TARGET_REGISTER = 6              # holding register alvo
 ARTIFICIAL_VALUE = 10            # valor falso enviado ao PLC1 (FC6)
-BUFFER_SIZE = 5                  # nº de valores reais para acumular
-EMA_ALPHA = 0.2                  # suavização do baseline real
+BUFFER_SIZE = 25                 # nº de valores reais para acumular
+EMA_ALPHA = 0.2                  # suavização da baseline real
 SYNTH_ALPHA = 0.1                # suavização do valor sintético adulterado
 NATURAL_RANGE_MIN = 1            # amplitude mínima para o valor adulterado "respirar"
-WAIT_SECONDS = 5 * 60            # período de espera (5 minutos)
+WAIT_SECONDS = 5 * 60            # período de espera (5 minutos) e recolha de dados
 
 STRICT_IP_FILTERS = True         # se False, aplica a todos
 # ==================
@@ -49,9 +49,9 @@ start_time = time.time()
 value_buffer = deque(maxlen=BUFFER_SIZE)
 fc3_requests = {}
 
-baseline_value = None   # baseline suavizado
-synthetic_value = None  # valor adulterado devolvido no FC3
-started = False         # True quando adulteração está ativa
+baseline_value = None   
+synthetic_value = None  
+started = False         
 
 def u16(b):
     return struct.unpack(">H", b)[0]
@@ -82,7 +82,6 @@ def update_baseline(new_val):
         baseline_value = (1 - EMA_ALPHA) * baseline_value + EMA_ALPHA * new_val
 
 def update_synthetic():
-    """Faz synthetic_value seguir baseline suavemente (EMA)."""
     global synthetic_value
     if not started or baseline_value is None:
         return

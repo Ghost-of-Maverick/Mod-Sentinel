@@ -1,3 +1,4 @@
+# Scouting script -> lê constantemente registos Modbus vindos respostas FC 3 (sem spoofing)
 import socket
 import time
 
