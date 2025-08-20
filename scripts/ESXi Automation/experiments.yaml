@@ -1,0 +1,92 @@
+# VMs geridas
+vms:
+  - name: KaliST01
+    base_snapshot: clean
+    guest_user: <kali_user>
+    guest_pass: <kali_pass>
+    power_on: true
+    tools_wait_sec: 120
+  - name: OpenPLC-PRV
+    base_snapshot: clean
+    guest_user: <user>
+    guest_pass: <pass>
+    power_on: true
+    tools_wait_sec: 60
+  - name: OpenPLC-RTU-PRV
+    base_snapshot: clean
+    guest_user: <user>
+    guest_pass: <pass>
+    power_on: true
+    tools_wait_sec: 60
+  - name: HMI-RSC-PRV
+    base_snapshot: clean
+    guest_user: <user>
+    guest_pass: <pass>
+    power_on: true
+    tools_wait_sec: 60
+
+# parâmetros globais de temporização (minutos)
+timing:
+  normal_pre: 10 # T0–T1 (sentinel a correr)
+  attack: 20 # T1–T2 (script de ataque)
+  normal_post: 10 # T2–T3 (cool‑down)
+
+# experiências — cada uma escolhe o script do ataque na Kali
+experiments:
+  - name: mitm
+    kali:
+      uploads:
+        - local: ./attacks/mitm_attack.sh
+          guest: /temp/mitm_attack.sh
+          chmod_x: true
+      dataset:
+        command: [] # opcional (outro recorder)
+        timeout_sec: 0
+        stop_signal: TERM
+        collect: []
+      attack:
+        command: ["/bin/bash", "/temp/mitm_attack.sh"]
+        timeout_sec: 0 # ignorado; usamos timing.attack
+        collect: []
+    collect_others: {}
+
+  - name: dos_syn
+    kali:
+      uploads:
+        - local: ./attacks/dos_attack.sh
+          guest: /temp/dos_attack.sh
+          chmod_x: true
+      dataset:
+        command: []
+        timeout_sec: 0
+        stop_signal: TERM
+        collect: []
+      attack:
+        command:
+          [
+            "/bin/bash",
+            "/temp/dos_attack.sh",
+            "hping3_synflood",
+            "172.27.224.250",
+            "eth0",
+          ]
+        timeout_sec: 0
+        collect: []
+    collect_others: {}
+
+  - name: scouting
+    kali:
+      uploads:
+        - local: ./attacks/run_scouting.sh
+          guest: /temp/run_scouting.sh
+          chmod_x: true
+      dataset:
+        command: []
+        timeout_sec: 0
+        stop_signal: TERM
+        collect: []
+      attack:
+        command: ["/bin/bash", "/temp/run_scouting.sh"]
+        timeout_sec: 0
+        collect: []
+    collect_others: {}
