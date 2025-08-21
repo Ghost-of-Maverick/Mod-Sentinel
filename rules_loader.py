@@ -1,12 +1,19 @@
-import re
 import yaml
 
 def load_config_variables():
+    """
+    Carrega variáveis MODBUS_CLIENT e MODBUS_SERVER do ficheiro config.yaml.
+    Retorna listas de IPs/hosts para cliente e servidor.
+    """
     with open("config.yaml", "r") as f:
         config = yaml.safe_load(f)
     return config.get("MODBUS_CLIENT", []), config.get("MODBUS_SERVER", [])
 
+
 def load_rules(file_path):
+    """
+    Lê o ficheiro de regras e devolve uma lista de dicionários com as regras processadas.
+    """
     with open(file_path, "r") as f:
         lines = f.readlines()
 
@@ -19,6 +26,7 @@ def load_rules(file_path):
         if not line or line.startswith("#"):
             continue
 
+        # Junta linhas quebradas até fechar com ')'
         if line.startswith("alert"):
             current_rule = line
         else:
@@ -32,16 +40,25 @@ def load_rules(file_path):
 
     return rules
 
+
 def parse_rule(rule_text, client_ips, server_ips):
+    """
+    Converte uma regra Snort-like para dicionário interno, substituindo variáveis.
+    """
     try:
+        # Separa header e opções
         header, options_raw = rule_text.split("(", 1)
         options_raw = options_raw.strip(") ")
         options = parse_options(options_raw)
 
-        header = header.replace("$MODBUS_CLIENT", "|MODBUS_CLIENT|")
-        header = header.replace("$MODBUS_SERVER", "|MODBUS_SERVER|")
+        # Substitui variáveis por listas de IPs
+        header = header.replace("$MODBUS_CLIENT", ",".join(client_ips))
+        header = header.replace("$MODBUS_SERVER", ",".join(server_ips))
 
         parts = header.split()
+        if len(parts) < 7:
+            raise ValueError("Header da regra inválido")
+
         proto, src, src_port, direction, dst, dst_port = parts[1:7]
 
         return {
@@ -58,7 +75,11 @@ def parse_rule(rule_text, client_ips, server_ips):
         print(f"[ERRO] Falha ao analisar regra: {e}\n{rule_text}")
         return None
 
+
 def parse_options(options_str):
+    """
+    Analisa as opções de uma regra Snort-like e devolve dicionário com campos conhecidos.
+    """
     options = {}
     contents = []
     parts = [p.strip() for p in options_str.split(";") if p.strip()]
@@ -67,7 +88,10 @@ def parse_options(options_str):
     while i < len(parts):
         part = parts[i]
 
-        if part.startswith("content:"):
+        if part.startswith("msg:"):
+            options["msg"] = part.split(":", 1)[1].strip().strip('"')
+
+        elif part.startswith("content:"):
             content_val = part.split(":", 1)[1].strip().strip('"')
             entry = {"content": content_val}
             if i + 1 < len(parts) and parts[i + 1].startswith("offset:"):
@@ -102,16 +126,17 @@ def parse_options(options_str):
                 "relative": "relative" in vals
             }
 
-        elif part.startswith("pcre:"):
-            options["pcre"] = part.split(":", 1)[1].strip().strip('"')
+        elif part.startswith("sid:"):
+            options["sid"] = part.split(":", 1)[1].strip()
 
-        elif part.startswith("dsize:"):
-            options["dsize"] = part.split(":", 1)[1].strip()
+        elif part.startswith("classtype:"):
+            options["classtype"] = part.split(":", 1)[1].strip()
 
-        elif part.startswith("flow:"):
-            options["flow"] = part.split(":", 1)[1].strip()
+        elif part.startswith("priority:"):
+            options["priority"] = part.split(":", 1)[1].strip()
 
         else:
+            # Guarda qualquer outra opção não tratada
             if ":" in part:
                 key, value = part.split(":", 1)
                 options[key.strip()] = value.strip().strip('"')
