@@ -9,7 +9,7 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-LOG_FILE="$LOG_DIR/modbus_reader_$(date +'%Y%m%d_%H%M%S').log"
+LOG_FILE="modbus_reader.log"
 
 echo "A iniciar leitura de registos Modbus..."
 echo "Logs serão gravados em: $LOG_FILE"

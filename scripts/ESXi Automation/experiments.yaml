@@ -1,3 +1,8 @@
+# Controlos de execução global
+run:
+  iterations: 1 # número de repetições (0 = infinito)
+  pause_between_runs_sec: 30 # pausa entre runs completos
+
 # VMs geridas
 vms:
   - name: KaliST01
@@ -29,64 +34,129 @@ vms:
 timing:
   normal_pre: 10 # T0–T1 (sentinel a correr)
   attack: 20 # T1–T2 (script de ataque)
-  normal_post: 10 # T2–T3 (cool‑down)
+  normal_post: 10 # T2–T3 (cool-down)
 
-# experiências — cada uma escolhe o script do ataque na Kali
 experiments:
-  - name: mitm
-    kali:
-      uploads:
-        - local: ./attacks/mitm_attack.sh
-          guest: /temp/mitm_attack.sh
-          chmod_x: true
-      dataset:
-        command: [] # opcional (outro recorder)
-        timeout_sec: 0
-        stop_signal: TERM
-        collect: []
-      attack:
-        command: ["/bin/bash", "/temp/mitm_attack.sh"]
-        timeout_sec: 0 # ignorado; usamos timing.attack
-        collect: []
-    collect_others: {}
-
-  - name: dos_syn
+  # ────────────────────────────── DoS: SYN flood ──────────────────────────────
+  - name: dos_synflood
     kali:
       uploads:
         - local: ./attacks/dos_attack.sh
-          guest: /temp/dos_attack.sh
+          guest: /tmp/dos_attack.sh
           chmod_x: true
       dataset:
-        command: []
+        command: ["cd /Mod-Sentinel && python3 main.py start"]
         timeout_sec: 0
         stop_signal: TERM
-        collect: []
+        collect:
+          - guest: /Mod-Sentinel/logs/
+            local: ./collected/sentinel/dos_synflood/
+      attack:
+        command:
+          ["cd /tmp && ./dos_attack.sh hping3_synflood 172.27.224.250 eth1"]
+        timeout_sec: 0
+        collect:
+          - guest: /tmp/dos_hping3_synflood.log
+            local: ./collected/dos/dos_hping3_synflood.log
+    collect_others: {}
+
+  # ────────────────────────────── DoS: TCP flood ──────────────────────────────
+  - name: dos_tcpflood
+    kali:
+      uploads:
+        - local: ./attacks/dos_attack.sh
+          guest: /tmp/dos_attack.sh
+          chmod_x: true
+      dataset:
+        command: ["cd /Mod-Sentinel && python3 main.py start"]
+        timeout_sec: 0
+        stop_signal: TERM
+        collect:
+          - guest: /Mod-Sentinel/logs/
+            local: ./collected/sentinel/dos_tcpflood/
       attack:
         command:
           [
-            "/bin/bash",
-            "/temp/dos_attack.sh",
-            "hping3_synflood",
-            "172.27.224.250",
-            "eth0",
+            "cd /tmp && ./dos_attack.sh nping_tcpflood 172.27.224.250 90000 900000",
           ]
         timeout_sec: 0
-        collect: []
+        collect:
+          - guest: /tmp/dos_nping_tcpflood.log
+            local: ./collected/dos/dos_nping_tcpflood.log
     collect_others: {}
 
-  - name: scouting
+  # ────────────────────────────── DoS: Modbus FC6 ─────────────────────────────
+  - name: dos_modbus_fc6
+    kali:
+      uploads:
+        - local: ./attacks/dos_attack.sh
+          guest: /tmp/dos_attack.sh
+          chmod_x: true
+        - local: ./attacks/modbus_modify.py
+          guest: /tmp/modbus_modify.py
+          chmod_x: false
+      dataset:
+        command: ["cd /Mod-Sentinel && python3 main.py start"]
+        timeout_sec: 0
+        stop_signal: TERM
+        collect:
+          - guest: /Mod-Sentinel/logs/
+            local: ./collected/sentinel/dos_modbus_fc6/
+      attack:
+        command:
+          ["cd /tmp && ./dos_attack.sh modbus_fc6_dos 172.27.224.250 502 1 6"]
+        timeout_sec: 0
+        collect:
+          - guest: /tmp/dos_modbus_fc6_dos.log
+            local: ./collected/dos/dos_modbus_fc6_dos.log
+    collect_others: {}
+
+  # ────────────────────────────── MitM Injection ──────────────────────────────
+  - name: mitm_injection
+    kali:
+      uploads:
+        - local: ./attacks/mitm_attack.sh
+          guest: /tmp/mitm_attack.sh
+          chmod_x: true
+        - local: ./attacks/modbus_injector.py
+          guest: /tmp/modbus_injector.py
+          chmod_x: false
+      dataset:
+        command: ["cd /Mod-Sentinel && python3 main.py start"]
+        timeout_sec: 0
+        stop_signal: TERM
+        collect:
+          - guest: /Mod-Sentinel/logs/
+            local: ./collected/sentinel/mitm_injection/
+      attack:
+        command: ["cd /tmp && ./mitm_attack.sh"]
+        timeout_sec: 0
+        collect:
+          - guest: /tmp/modbus_mitm.log
+            local: ./collected/mitm/modbus_mitm.log
+    collect_others: {}
+
+  # ────────────────────────────── Modbus Reader ───────────────────────────────
+  - name: modbus_reader_only
     kali:
       uploads:
         - local: ./attacks/run_scouting.sh
-          guest: /temp/run_scouting.sh
+          guest: /tmp/run_scouting.sh
           chmod_x: true
+        - local: ./attacks/modbus_reader.py
+          guest: /tmp/modbus_reader.py
+          chmod_x: false
       dataset:
-        command: []
+        command: ["cd /Mod-Sentinel && python3 main.py start"]
         timeout_sec: 0
         stop_signal: TERM
-        collect: []
+        collect:
+          - guest: /Mod-Sentinel/logs/
+            local: ./collected/sentinel/modbus_reader_only/
       attack:
-        command: ["/bin/bash", "/temp/run_scouting.sh"]
+        command: ["cd /tmp && sudo ./run_scouting.sh"]
         timeout_sec: 0
-        collect: []
+        collect:
+          - guest: /tmp/modbus_reader.log
+            local: ./collected/reader/modbus_reader.log
     collect_others: {}

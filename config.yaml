@@ -14,4 +14,10 @@ allowed_macs:
   "172.27.224.10": "00:0c:29:64:ce:e3" # HMI
   "172.27.224.250": "00:0c:29:c1:c9:f4" # PLC 1
   "172.27.224.251": "00:0c:29:01:28:44" # PLC 2
-  # ...
+
+dos_detection:
+  cooldown_sec: 3
+  syn: { window_sec: 1, per_dst: 400, unique_src_per_dst: 120 }
+  arp: { window_sec: 1, per_target: 200 }
+  udp21: { window_sec: 1, per_dst: 400 }
+  icmp: { window_sec: 1, per_dst: 400 }

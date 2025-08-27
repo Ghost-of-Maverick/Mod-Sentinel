@@ -24,8 +24,7 @@ STRICT_IP_FILTERS = True         # se False, aplica a todos
 # ==================
 
 # ===== LOGGING =====
-ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-LOGFILE = f"modbus_debug_{ts}.log"
+LOGFILE = f"modbus_mitm.log"
 
 def log(msg, color=None):
     COLORS = {
