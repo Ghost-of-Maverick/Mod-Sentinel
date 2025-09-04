@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-vmware_experiments.py — Orquestração multi‑VM (ESXi standalone) com snapshots
+vmware_experiences.py — Orquestração multi‑VM (ESXi standalone) com snapshots
 
 Requisitos
 - Python 3.9+
@@ -8,7 +8,6 @@ Requisitos
 - VMware Tools a correr (obrigatório na Kali; recomendado nas restantes).
 - Credenciais do guest OS.
 
-Configuração (YAML) — exemplo `experiments.yaml`
 -------------------------------------------------
 # VMs geridas
 vms:
@@ -44,18 +43,9 @@ timing:
   normal_post: 10  # T2–T3 (cool‑down)
 
 Execução (exemplo):
-  python vmware_experiments.py \
+  python vmware_experiences.py \
     --esxi 192.168.1.10 --user root --password 'ESXI_PASS' --insecure \
     --config ./experiments.yaml --snapshot-memory --snapshot-quiesce
-
-Como configurar o YAML
-- Adiciona no topo (opcional):
-run:
-  iterations: 0             # 0 = correr até interrupção; por omissão 1
-  pause_between_runs_sec: 30 # segundos entre execuções completas
-
-- Mantém `dataset.command` para start do sentinel: ["cd /Mod-Sentinel && python3 main.py start"]
-  e `dataset.collect` para indicar que queres copiar /Mod-Sentinel/logs/ (o orquestrador usa tar e transfere tudo).
 
 Funcionamento (resumo do ciclo por experiência)
 1) Revert a snapshots base nas 4 VMs e power-on / wait tools.
@@ -73,7 +63,6 @@ Detalhes técnicos da implementação
 - Para o Mod‑Sentinel o orquestrador usa StartProgramInGuest (com nohup) para arrancar o processo em background e `StartProgramInGuest` para o comando stop que devolve quando terminado.
 - Para recolher `/Mod-Sentinel/logs/` o orquestrador executa `tar -C /Mod-Sentinel -czf /tmp/modsentinel_<run>_<exp>.tgz logs` e depois descarrega o `/tmp`.
 - Ficheiros recolhidos são colocados em: `./runs/<base_ts>/runNN_<ts>/<experiment>/...`.
-
 """
 
 import argparse
