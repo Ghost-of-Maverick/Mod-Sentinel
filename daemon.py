@@ -4,7 +4,6 @@ import yaml
 import threading
 from datetime import datetime
 from packet_sniffer import start_sniffer_thread
-from detector import init_detector
 from logger import log_event
 from utils import write_pid, remove_pid, check_pid
 from app_logger import logger
@@ -25,14 +24,10 @@ def load_config():
 def daemon_loop():
     config = load_config()
 
-    rules_file = config.get("rules_file", "rules/modsentinel.rules")
     interface = config.get("interface", "eth0")
 
     logger.info("ModSentinel iniciado.")
     logger.info(f"Interface configurada: {interface}")
-
-    # Inicializa regras
-    init_detector(rules_file)
 
     # Inicia sniffer em thread
     start_sniffer_thread(interface)
