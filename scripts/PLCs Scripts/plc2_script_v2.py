@@ -2,6 +2,7 @@
 import socket
 import logging
 import math
+import random
 from datetime import datetime
 from time import time
 from pymodbus.client import ModbusTcpClient
@@ -16,19 +17,16 @@ TEMP_REGISTER = 6
 UDP_LISTEN_IP = "0.0.0.0"
 UDP_LISTEN_PORT = 5005
 
-# Referências térmicas
+# Limites de segurança
 TEMP_MIN = 15.0
-TEMP_MAX = 120.0
-TEMP_LOW = 30.0        # mínimo do ciclo motor ON
-TEMP_HIGH = 41.0       # máximo do ciclo motor ON
-TEMP_CRITICO = 70.0    # aquecimento rápido se motor OFF
+TEMP_MAX = 150.0  # apenas limite gráfico/segurança
 
-# Constantes físicas
-K_CYCLE = 0.02         # motor ON (ciclo normal)
-K_CRITICO = 0.08       # subida rápida ataque
-K_RECUP = 0.04         # descida recuperação
+# Constantes físicas (default)
+K_CYCLE = 0.015     # ciclo natural (motor ON)
+K_CRITICO = 0.05    # subida rápida (motor OFF)
+K_RECUP = 0.03      # recuperação pós-ataque
 
-READ_INTERVAL = 1.0    # segundos
+READ_INTERVAL = 1.0  # segundos
 
 # ---------------- ESTADO ----------------
 temp_atual = 40.0
@@ -37,7 +35,7 @@ ultimo_dado_motor = None
 start_time = time()
 
 phase = "ciclo"          # ciclo / ataque / recuperacao
-alvo = TEMP_LOW          # alvo inicial
+alvo = 30.0              # alvo inicial
 historico_temperatura = []
 
 logging.basicConfig(level=logging.INFO,
@@ -78,34 +76,34 @@ def salvar_grafico_png():
 
 # ---------------- MODELO FÍSICO ----------------
 def atualizar_temperatura(motor_state_local, temp, dt=1.0):
-    global phase, alvo, TEMP_LOW, TEMP_HIGH, TEMP_CRITICO, K_CYCLE, K_CRITICO, K_RECUP
+    global phase, alvo, K_CYCLE, K_CRITICO, K_RECUP
 
     if motor_state_local == 1:
         if phase in ["ataque", "recuperacao"]:
             # recuperação depois de ataque
             phase = "recuperacao"
-            k = K_RECUP
-            delta = (alvo - temp) * (1 - math.exp(-k * dt))
+            delta = (alvo - temp) * (1 - math.exp(-K_RECUP * dt))
             temp += delta
             if abs(temp - alvo) < 0.5:
                 phase = "ciclo"
-                alvo = TEMP_LOW if temp > (TEMP_LOW + TEMP_HIGH)/2 else TEMP_HIGH
+                alvo = random.uniform(29.5, 31.5) if temp > 35 else random.uniform(40.0, 43.0)
         else:
             # ciclo normal motor ON
             phase = "ciclo"
-            k = K_CYCLE
-            delta = (alvo - temp) * (1 - math.exp(-k * dt))
+            delta = (alvo - temp) * (1 - math.exp(-K_CYCLE * dt))
             temp += delta
-            # inverter alvo quando se aproxima
             if abs(temp - alvo) < 0.3:
-                alvo = TEMP_HIGH if alvo == TEMP_LOW else TEMP_LOW
+                # escolhe novo alvo aleatório
+                if alvo < 35:
+                    alvo = random.uniform(40.0, 43.0)
+                else:
+                    alvo = random.uniform(29.5, 31.5)
 
     else:
-        # motor OFF inesperado (ataque)
+        # motor OFF inesperado (ataque) → subida contínua
         phase = "ataque"
-        k = K_CRITICO
-        delta = (TEMP_CRITICO - temp) * (1 - math.exp(-k * dt))
-        temp += delta
+        ganho = 1 + random.uniform(-0.1, 0.1)  # ruído leve
+        temp += K_CRITICO * dt * ganho
 
     temp = max(TEMP_MIN, min(TEMP_MAX, temp))
     return temp
@@ -114,7 +112,7 @@ def atualizar_temperatura(motor_state_local, temp, dt=1.0):
 @ui.page('/')
 def index():
     global temp_atual, motor_state, ultimo_dado_motor, start_time, phase, alvo
-    global TEMP_LOW, TEMP_HIGH, TEMP_CRITICO, K_CYCLE, K_CRITICO, K_RECUP, historico_temperatura
+    global K_CYCLE, K_CRITICO, K_RECUP, historico_temperatura
 
     with ui.row().style("height:100vh; width:100vw; display:flex; align-items:center; justify-content:center;"):
         with ui.column().classes("items-center justify-center p-4"):
@@ -144,29 +142,11 @@ def index():
                     chart.options['series'][0]['data'] = []
                     chart.options['xAxis']['data'] = []
                     chart.update()
-                    globals().update(temp_atual=40.0, phase="ciclo", alvo=TEMP_LOW, start_time=time(), motor_state=1)
+                    globals().update(temp_atual=40.0, phase="ciclo", alvo=30.0, start_time=time(), motor_state=1)
                 ui.button("🔄 Resetar Simulação", on_click=resetar, color="red")
 
             # ---------------- Sliders ----------------
             with ui.expansion("⚙️ Ajustes do Modelo", icon="tune"):
-
-                with ui.row():
-                    ui.label("TEMP_LOW (mínimo ciclo)")
-                    ui.slider(min=20, max=40, value=TEMP_LOW, step=0.5,
-                              on_change=lambda e: globals().update(TEMP_LOW=e.value)) \
-                      .props("label-always")
-
-                with ui.row():
-                    ui.label("TEMP_HIGH (máximo ciclo)")
-                    ui.slider(min=35, max=50, value=TEMP_HIGH, step=0.5,
-                              on_change=lambda e: globals().update(TEMP_HIGH=e.value)) \
-                      .props("label-always")
-
-                with ui.row():
-                    ui.label("TEMP_CRITICO (ataque)")
-                    ui.slider(min=60, max=100, value=TEMP_CRITICO, step=1,
-                              on_change=lambda e: globals().update(TEMP_CRITICO=e.value)) \
-                      .props("label-always")
 
                 with ui.row():
                     ui.label("K_CYCLE (ciclo)")
@@ -215,7 +195,7 @@ def index():
                 temp_label.set_text(f'🌡️ Temperatura: {temp_atual:.2f} ºC | 📤 Enviado: {temp_enviar} ºC')
                 estado_label.set_text(f'⚙️ Motor: {"ON" if motor_state else "OFF"} | Phase: {phase}')
                 clock_label.set_text(f'🕒 {datetime.now().strftime("%H:%M:%S")}')
-                debug_label.set_text(f"Último dado: {ultimo_dado_motor} | Tempo decorrido: {int(time()-start_time)}s")
+                debug_label.set_text(f"Último dado motor: {ultimo_dado_motor} | Tempo decorrido: {int(time()-start_time)}s")
 
                 # Atualizar gráfico
                 tempo_atual_s = int(time() - start_time)
