@@ -13,8 +13,8 @@ PLC1_IP = "172.27.224.250"
 PLC2_IP = "172.27.224.251"
 
 TARGET_REGISTER = 6              # holding register alvo
-ARTIFICIAL_VALUE = 10            # valor falso enviado ao PLC1 (FC6)
-BUFFER_SIZE = 25                 # nº de valores reais para acumular
+ARTIFICIAL_VALUE = 20            # valor falso enviado ao PLC1 (FC6)
+BUFFER_SIZE = 100                # nº de valores reais para acumular
 EMA_ALPHA = 0.2                  # suavização da baseline real
 SYNTH_ALPHA = 0.1                # suavização do valor sintético adulterado
 NATURAL_RANGE_MIN = 1            # amplitude mínima para o valor adulterado "respirar"
