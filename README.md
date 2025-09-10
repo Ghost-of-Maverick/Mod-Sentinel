@@ -8,7 +8,7 @@ Tabela de Conteúdos
 
 ## Sistema Virtualizado
 
-![Arquitetura de virtualização no VMWare ESXi. ](./notas/nexus.drawio.png)
+![Arquitetura de virtualização no VMWare ESXi. ](./imagens/nexus.drawio.png)
 
 Arquitetura de virtualização no VMWare ESXi.
 
@@ -24,7 +24,7 @@ Para recolher dados deste sistema, foram apenas utilizadas 4 máquinas virtuais 
 3. **HMI-RSC-PRV: HMI**
 4. **VM Kali Linux:** máquina atacante e, simultaneamente, onde é analisado o tráfego do sistema através da interface _mirror_
 
-![Representação do sistema SCADA.](./notas/system.png)
+![Representação do sistema SCADA.](./imagens/system.png)
 
 Representação do sistema SCADA.
 
@@ -148,7 +148,7 @@ ui.run(port=8081)
 
 ```
 
-![Interface web do PLC 2.](./notas/image.png)
+![Interface web do PLC 2.](./imagens/image.png)
 
 Interface web do PLC 2.
 
@@ -169,7 +169,7 @@ sudo RTU/bin/python -m pip install pandas
 - **Intervalo de tempo:** Fevereiro a Setembro de 2020.
 - **Utilidade:** boa para observar padrões sazonais ou alterações de longo prazo no sistema.
 
-![Figure_1.png](./notas/Figure_1.png)
+![Figure_1.png](./imagens/Figure_1.png)
 
 **Figura 2 – Primeiras 5 Horas**
 
@@ -177,21 +177,21 @@ sudo RTU/bin/python -m pip install pandas
 - **Utilidade:** ideal para identificar comportamentos cíclicos horários ou variações repetitivas.
 - **Nota**: vê-se claramente a variação de temperatura do óleo, os padrões de descida podem ser relativos a um certo momento em que o motor é ligado e é acionado um mecanismo de refrigeração (pelo **PLC 1**), fazendo baixar a temperatura do óleo.
 
-![Figure_2.png](./notas/Figure_2.png)
+![Figure_2.png](./imagens/Figure_2.png)
 
 **Figura 3 – Primeira Hora**
 
 - **Intervalo de tempo:** 2020-02-01 00:00:00 → 01:00:00.
 - **Utilidade:** boa para analisar variações curtas e identificar eventuais anomalias pontuais.
 
-![Figure_3.png](./notas/Figure_3.png)
+![Figure_3.png](./imagens/Figure_3.png)
 
 **Figura 4 – Primeiros 15 Minutos**
 
 - **Intervalo de tempo:** 2020-02-01 00:00:00 → 00:15:00.
 - **Utilidade:** perfeita para ver a resposta imediata do sistema ou sensores, útil em calibração ou diagnóstico. Vai estar certamente nos datasets a criar para as experiências.
 
-![Figure_4.png](./notas/Figure_4.png)
+![Figure_4.png](./imagens/Figure_4.png)
 
 Esta foi a primeira versão de simulação de temperatura utilizada. No entanto, o uso de um dataset estático pode levar a alguns problemas no caso de estudo, isto pois, quando ocorrem ataques, é suposto a temperatura variar, o que não acontece no cenário proposto anteriormente.
 
@@ -364,7 +364,7 @@ Ver logs:
 journalctl -u motor_sender.service -f
 ```
 
-![Simulação de temperatura consoante o estado do motor.](./notas/temp_simulation.png)
+![Simulação de temperatura consoante o estado do motor.](./imagens/temp_simulation.png)
 
 Simulação de temperatura consoante o estado do motor.
 
@@ -599,13 +599,13 @@ if __name__ in {"__main__", "__mp_main__"}:
 
 A interface permite visualizar o estado do motor que o PLC 2 está a receber do PLC 1, o tempo decorrido, e o gráfico da variação da temperatura. Sendo possível dar reset ao estado da temperatura, e também, salvar o gráfico de variação de temperatura até ao momento.
 
-![Interface gráfica do PLC 2: visualização de dados.](./notas/image%201.png)
+![Interface gráfica do PLC 2: visualização de dados.](./imagens/image%201.png)
 
 Interface gráfica do PLC 2: visualização de dados.
 
 Além disso, é possível através da interface alterar os parâmetros de variação de temperatura, apresentados de seguida.
 
-![Alteração de parâmetros de temperatura no PLC 2.](./notas/image%202.png)
+![Alteração de parâmetros de temperatura no PLC 2.](./imagens/image%202.png)
 
 Alteração de parâmetros de temperatura no PLC 2.
 
@@ -613,7 +613,7 @@ Alteração de parâmetros de temperatura no PLC 2.
 
 A base é a Lei de Newton do Arrefecimento/Aquecimento:
 
-![image.png](./notas/image%203.png)
+![image.png](./imagens/image%203.png)
 
 - `T` é a temperatura atual
 - `T_alvo` é a temperatura de equilíbrio (depende do estado: ciclo normal, ataque ou recuperação)
@@ -621,7 +621,7 @@ A base é a Lei de Newton do Arrefecimento/Aquecimento:
 
 A solução da equação é exponencial assintótica:
 
-![image.png](./notas/image%204.png)
+![image.png](./imagens/image%204.png)
 
 No código traduz-se em algo como:
 
@@ -658,7 +658,7 @@ K_RECUP = 0.03    # intermédio → descida razoavelmente rápida
 
 Além disso, podes afinar estas variáveis em tempo real pelos sliders da GUI NiceGUI (secção ⚙️ Ajustes do Modelo mencionada acima)
 
-![Exemplo de simulação de temperatura com ataque de MitM ofensivo.](./notas/image%205.png)
+![Exemplo de simulação de temperatura com ataque de MitM ofensivo.](./imagens/image%205.png)
 
 Exemplo de simulação de temperatura com ataque de MitM ofensivo.
 
@@ -672,7 +672,7 @@ Exemplo de simulação de temperatura com ataque de MitM ofensivo.
 
 Para este projeto, foi criada uma aplicação em Python que deverá ser configurado na interface com acesso a um _mirror_ do tráfego. A máquina utilizada foi a máquina virtual Kali Linux.
 
-![Representação do funcionamento da aplicação no sistema virtualizado.](./notas/mod-sentinel.png)
+![Representação do funcionamento da aplicação no sistema virtualizado.](./imagens/mod-sentinel.png)
 
 Representação do funcionamento da aplicação no sistema virtualizado.
 
@@ -712,7 +712,7 @@ Durante a execução da aplicação são gerados quatro tipos de _logs_:
 1. `app.log`: contém _logs_ relativos à execução da aplicação como criação do _daemon_, criação de capturas `.pcap`, erros de execução, entre outros.
 2. `modsentinel_20250621_191549.log`: criada a cada vez que a aplicação é iniciada no formato `modsentinel_%Y-%m-%d_%H%M%S.log`→ contém todos os pacotes Modbus analisados na captura de tráfego de uma forma estruturada, como no exemplo seguinte:
 
-   ![image.png](./notas/image%206.png)
+   ![image.png](./imagens/image%206.png)
 
 3. `trafego_20250621_191549.csv`: de forma semelhante ao anterior, é criado a cada vez que a aplicação é iniciada no formato `trafego_%Y-%m-%d_%H%M%S.csv` → cria os dados a serem usados pelo modelo de ML.
 4. `captura_%Y-%m-%d_%H%M%S.pcap`: captura efetuada sempre que a aplicação é iniciada no formato `captura_%Y-%m-%d_%H%M%S.pcap` → estes são os pacotes analisados e guardados nos ficheiros anteriores.
@@ -731,17 +731,17 @@ Este ficheiro contém dados de pacotes Modbus que se consideram ser importantes 
 - Transation ID (Modbus Header) - identificador único da transação Modbus. Pode ser útil para correlacionar pedidos e respostas e detectar tentativas de _replay_ ou manipulação. Neste caso não será útil pois o transation ID é sempre 0.
 - Unit ID (Modbus Header) - identifica o _slave_ Modbus alvo. Ajuda a perceber se um atacante está a tentar aceder a dispositivos específicos da rede.
 - TCP flags - indicam o estado da sessão TCP (`SYN`, `ACK`, `FIN`, etc.). São essenciais para identificar padrões de _scans_, conexões suspeitas ou _resets_ forçados, ou, tentativas de DoS através de `SYN` _floods_.
-  | Flag | Significado          | Valor binário | Valor hexa |
+  | Flag | Significado | Valor binário | Valor hexa |
   | ---- | -------------------- | ------------- | ---------- |
-  | URG  | Urgent Pointer field | 00100000      | 0x20       |
-  | ACK  | Acknowledgment field | 00010000      | 0x10       |
-  | PSH  | Push Function        | 00001000      | 0x08       |
-  | RST  | Reset the connection | 00000100      | 0x04       |
-  | SYN  | Synchronize sequence | 00000010      | 0x02       |
-  | FIN  | Finish sending data  | 00000001      | 0x01       |
+  | URG | Urgent Pointer field | 00100000 | 0x20 |
+  | ACK | Acknowledgment field | 00010000 | 0x10 |
+  | PSH | Push Function | 00001000 | 0x08 |
+  | RST | Reset the connection | 00000100 | 0x04 |
+  | SYN | Synchronize sequence | 00000010 | 0x02 |
+  | FIN | Finish sending data | 00000001 | 0x01 |
 - Length - tamanho total do pacote. Valores fora do normal podem indicar tentativas de exploração de _buffer overflow_ ou outros ataques.
 - Function Code (Modbus) - define o tipo de operação Modbus (leitura, escrita, etc.). Pode revelar tentativas de acesso ou manipulação de dados críticos.
-  ![Function Codes do protocolo Modbus ([fonte](https://www.picotech.com/library/knowledge-bases/oscilloscopes/modbus-serial-protocol-decoding)).](./notas/modbus-function-codes-examples.png)
+  ![Function Codes do protocolo Modbus ([fonte](https://www.picotech.com/library/knowledge-bases/oscilloscopes/modbus-serial-protocol-decoding)).](./imagens/modbus-function-codes-examples.png)
   Function Codes do protocolo Modbus ([fonte](https://www.picotech.com/library/knowledge-bases/oscilloscopes/modbus-serial-protocol-decoding)).
 - Payload (dados Modbus) - conteúdo da mensagem Modbus. A análise detalhada pode detectar comandos maliciosos, valores fora do normal ou injeções de dados.
 - Malicious - forma de identificar tráfego legítimo de tráfego malicioso. Se o valor for 0, trata-se de tráfego legítimo, se for X, trata-se de tráfego malicioso (possível ataque).
@@ -926,7 +926,7 @@ content:"|02|"; offset:8; depth:1;3
 
 As experiências vão ser efetuadas numa janela semelhante em todas as execuções, representada na Figura seguinte.
 
-![Representação das fases de cada execução.](./notas/dataset-time.png)
+![Representação das fases de cada execução.](./imagens/dataset-time.png)
 
 Representação das fases de cada execução.
 
@@ -946,7 +946,7 @@ Vão ser criados datasets em formato CSV para cada ataque, onde estará tráfego
 **Ponto II**: PLC 2 para o PLC 1, enganando o PLC 1 e manipulando o motor, através do envio de uma temperatura muito baixa incorreta | arpspoof + python script |
 | Scouting | Function codes de diagnóstico não são suportados no PLC, como se pode observar na figura abaixo. Logo, o ataque neste caso será a leitura de registos usando um script python que está constantemente a usar o function code 3 | python script |
 
-![PLC 1 não suporta funções de diagnóstico (exemplo function code 2B).](./notas/image%207.png)
+![PLC 1 não suporta funções de diagnóstico (exemplo function code 2B).](./imagens/image%207.png)
 
 PLC 1 não suporta funções de diagnóstico (exemplo function code 2B).
 
@@ -1188,7 +1188,7 @@ O script prepara e executa um ataque de ARP spoofing bidirecional e injeção de
 - O PLC2 envia dados para o PLC1, e o motor é controlado normalmente pelo PLC 1
 - Cada dispositivo sabe o MAC de cada IP pela cache da sua tabela ARP
 
-![arp_spoof.png](./notas/arp_spoof.png)
+![arp_spoof.png](./imagens/arp_spoof.png)
 
 O código do script é o seguinte:
 
@@ -1333,7 +1333,7 @@ Sempre que modifica o pacote, apaga os campos `len` e `chksum` do IP/TCP para o 
   - Verde = adulteração FC3
   - Amarelo = pedidos FC3 legítimos
 
-![Representação do timming do ataque MitM.](./notas/arp_spoof_timming.png)
+![Representação do timming do ataque MitM.](./imagens/arp_spoof_timming.png)
 
 Representação do timming do ataque MitM.
 
@@ -1417,7 +1417,7 @@ if __name__ == '__main__':
             time.sleep(2)
 ```
 
-![Leitura de valores de registos através de um dispositivo não autorizado.](./notas/image%208.png)
+![Leitura de valores de registos através de um dispositivo não autorizado.](./imagens/image%208.png)
 
 Leitura de valores de registos através de um dispositivo não autorizado.
 
@@ -1563,7 +1563,7 @@ No host, tudo vai para a pasta `./runs/`:
    - `Timeline: timeline.csv | timeline.json` no fim de cada run
 3. Para parar, usar `CTRL+C`
 
-![Fluxograma do script de automação das experiências e orquestração das VMs no ESXi.](./notas/esxi_api.png)
+![Fluxograma do script de automação das experiências e orquestração das VMs no ESXi.](./imagens/esxi_api.png)
 
 Fluxograma do script de automação das experiências e orquestração das VMs no ESXi.
 
