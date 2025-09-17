@@ -1,162 +1,62 @@
-# Controlos de execução global
-run:
-  iterations: 1 # número de repetições (0 = infinito)
-  pause_between_runs_sec: 30 # pausa entre runs completos
-
 # VMs geridas
 vms:
   - name: KaliST01
     base_snapshot: clean
-    guest_user: <kali_user>
-    guest_pass: <kali_pass>
-    power_on: true
+    guest_user: root
+    guest_pass: pass
     tools_wait_sec: 120
+
   - name: OpenPLC-PRV
     base_snapshot: clean
-    guest_user: <user>
-    guest_pass: <pass>
-    power_on: true
-    tools_wait_sec: 60
+    guest_user: root
+    guest_pass: pass
+    tools_wait_sec: 120
+
   - name: OpenPLC-RTU-PRV
     base_snapshot: clean
-    guest_user: <user>
-    guest_pass: <pass>
-    power_on: true
-    tools_wait_sec: 60
+    guest_user: root
+    guest_pass: pass
+    tools_wait_sec: 120
+
   - name: HMI-RSC-PRV
     base_snapshot: clean
-    guest_user: <user>
-    guest_pass: <pass>
-    power_on: true
-    tools_wait_sec: 60
+    guest_user: x
+    guest_pass: cdis0000!
+    tools_wait_sec: 120
 
-# parâmetros globais de temporização (minutos)
-timing:
-  normal_pre: 10 # T0–T1 (sentinel a correr)
-  attack: 20 # T1–T2 (script de ataque)
-  normal_post: 10 # T2–T3 (cool-down)
-
+# Experiências disponíveis
 experiments:
-  # ────────────────────────────── DoS: SYN flood ──────────────────────────────
   - name: dos_synflood
-    kali:
-      uploads:
-        - local: ./attacks/dos_attack.sh
-          guest: /tmp/dos_attack.sh
-          chmod_x: true
-      dataset:
-        command: ["cd /Mod-Sentinel && python3 main.py start"]
-        timeout_sec: 0
-        stop_signal: TERM
-        collect:
-          - guest: /Mod-Sentinel/logs/
-            local: ./collected/sentinel/dos_synflood/
-      attack:
-        command:
-          ["cd /tmp && ./dos_attack.sh hping3_synflood 172.27.224.250 eth1"]
-        timeout_sec: 0
-        collect:
-          - guest: /tmp/dos_hping3_synflood.log
-            local: ./collected/dos/dos_hping3_synflood.log
-    collect_others: {}
+    description: "DoS SYN flood (hping3)"
+    kali_attack: "/temp/dos_attack.sh hping3_synflood 172.27.224.250 eth1"
+    pre_time: 10
+    attack_time: 10
+    post_time: 10
 
-  # ────────────────────────────── DoS: TCP flood ──────────────────────────────
   - name: dos_tcpflood
-    kali:
-      uploads:
-        - local: ./attacks/dos_attack.sh
-          guest: /tmp/dos_attack.sh
-          chmod_x: true
-      dataset:
-        command: ["cd /Mod-Sentinel && python3 main.py start"]
-        timeout_sec: 0
-        stop_signal: TERM
-        collect:
-          - guest: /Mod-Sentinel/logs/
-            local: ./collected/sentinel/dos_tcpflood/
-      attack:
-        command:
-          [
-            "cd /tmp && ./dos_attack.sh nping_tcpflood 172.27.224.250 90000 900000",
-          ]
-        timeout_sec: 0
-        collect:
-          - guest: /tmp/dos_nping_tcpflood.log
-            local: ./collected/dos/dos_nping_tcpflood.log
-    collect_others: {}
+    description: "DoS TCP flood (nping)"
+    kali_attack: "/temp/dos_attack.sh nping_tcpflood 172.27.224.250 90000 900000"
+    pre_time: 10
+    attack_time: 10
+    post_time: 10
 
-  # ────────────────────────────── DoS: Modbus FC6 ─────────────────────────────
   - name: dos_modbus_fc6
-    kali:
-      uploads:
-        - local: ./attacks/dos_attack.sh
-          guest: /tmp/dos_attack.sh
-          chmod_x: true
-        - local: ./attacks/modbus_modify.py
-          guest: /tmp/modbus_modify.py
-          chmod_x: false
-      dataset:
-        command: ["cd /Mod-Sentinel && python3 main.py start"]
-        timeout_sec: 0
-        stop_signal: TERM
-        collect:
-          - guest: /Mod-Sentinel/logs/
-            local: ./collected/sentinel/dos_modbus_fc6/
-      attack:
-        command:
-          ["cd /tmp && ./dos_attack.sh modbus_fc6_dos 172.27.224.250 502 1 6"]
-        timeout_sec: 0
-        collect:
-          - guest: /tmp/dos_modbus_fc6_dos.log
-            local: ./collected/dos/dos_modbus_fc6_dos.log
-    collect_others: {}
+    description: "DoS Modbus FC6 flood"
+    kali_attack: "/temp/dos_attack.sh modbus_fc6_dos 172.27.224.250 502 1 6"
+    pre_time: 10
+    attack_time: 10
+    post_time: 10
 
-  # ────────────────────────────── MitM Injection ──────────────────────────────
   - name: mitm_injection
-    kali:
-      uploads:
-        - local: ./attacks/mitm_attack.sh
-          guest: /tmp/mitm_attack.sh
-          chmod_x: true
-        - local: ./attacks/modbus_injector.py
-          guest: /tmp/modbus_injector.py
-          chmod_x: false
-      dataset:
-        command: ["cd /Mod-Sentinel && python3 main.py start"]
-        timeout_sec: 0
-        stop_signal: TERM
-        collect:
-          - guest: /Mod-Sentinel/logs/
-            local: ./collected/sentinel/mitm_injection/
-      attack:
-        command: ["cd /tmp && ./mitm_attack.sh"]
-        timeout_sec: 0
-        collect:
-          - guest: /tmp/modbus_mitm.log
-            local: ./collected/mitm/modbus_mitm.log
-    collect_others: {}
+    description: "Modbus MITM injection"
+    kali_attack: "/temp/mitm_attack.sh"
+    pre_time: 10
+    attack_time: 10
+    post_time: 10
 
-  # ────────────────────────────── Modbus Reader ───────────────────────────────
   - name: modbus_reader_only
-    kali:
-      uploads:
-        - local: ./attacks/run_scouting.sh
-          guest: /tmp/run_scouting.sh
-          chmod_x: true
-        - local: ./attacks/modbus_reader.py
-          guest: /tmp/modbus_reader.py
-          chmod_x: false
-      dataset:
-        command: ["cd /Mod-Sentinel && python3 main.py start"]
-        timeout_sec: 0
-        stop_signal: TERM
-        collect:
-          - guest: /Mod-Sentinel/logs/
-            local: ./collected/sentinel/modbus_reader_only/
-      attack:
-        command: ["cd /tmp && sudo ./run_scouting.sh"]
-        timeout_sec: 0
-        collect:
-          - guest: /tmp/modbus_reader.log
-            local: ./collected/reader/modbus_reader.log
-    collect_others: {}
+    description: "Passive Modbus reader"
+    kali_attack: "/temp/run_scouting.sh"
+    pre_time: 2
+    attack_time: 2
+    post_time: 2

@@ -4,10 +4,13 @@ import logging
 import math
 import random
 from datetime import datetime
-from time import time
+import time
 from pymodbus.client import ModbusTcpClient
 from nicegui import ui
 import matplotlib.pyplot as plt
+import os
+import shutil
+from typing import Optional, Tuple
 
 # ---------------- CONFIG ----------------
 PLC1_IP = "172.27.224.250"
@@ -32,33 +35,72 @@ READ_INTERVAL = 1.0  # segundos
 temp_atual = 40.0
 motor_state = 1          # motor ON por defeito
 ultimo_dado_motor = None
-start_time = time()
+start_time = time.time()
 
 phase = "ciclo"          # ciclo / ataque / recuperacao
 alvo = 30.0              # alvo inicial
 historico_temperatura = []
 
+# Globals para conexões que serão inicializadas no main
+client = None
+modbus_connected = False
+sock = None
+
 logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s %(levelname)s: %(message)s")
 logger = logging.getLogger("PLC2")
 
-# ---------------- MODBUS ----------------
-client = ModbusTcpClient(PLC1_IP, port=PLC1_PORT)
-if not client.connect():
-    logger.error("Não foi possível conectar ao PLC1 %s:%s", PLC1_IP, PLC1_PORT)
+# ---------------- FUNÇÕES DE RECONEXÃO / CREATION ----------------
+def get_modbus_client() -> Tuple[Optional[ModbusTcpClient], bool]:
+    try:
+        c = ModbusTcpClient(PLC1_IP, port=PLC1_PORT)
+        ok = c.connect()
+        if ok:
+            logger.info("Ligação Modbus estabelecida com PLC1 %s:%s", PLC1_IP, PLC1_PORT)
+            return c, True
+        else:
+            logger.error("Não foi possível conectar ao PLC1 %s:%s", PLC1_IP, PLC1_PORT)
+            try:
+                c.close()
+            except Exception:
+                pass
+            return c, False
+    except Exception as e:
+        logger.exception("Excepção ao criar Modbus client: %s", e)
+        return None, False
 
-# ---------------- UDP ----------------
-sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-sock.bind((UDP_LISTEN_IP, UDP_LISTEN_PORT))
-sock.setblocking(False)
-logger.info("UDP listener à escuta em %s:%s", UDP_LISTEN_IP, UDP_LISTEN_PORT)
+
+def get_udp_socket():
+    tries = 0
+    while True:
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            s.bind((UDP_LISTEN_IP, UDP_LISTEN_PORT))
+            s.setblocking(False)
+            logger.info("UDP listener à escuta em %s:%s", UDP_LISTEN_IP, UDP_LISTEN_PORT)
+            return s
+        except OSError as e:
+            tries += 1
+            logger.error("Erro ao fazer bind UDP (try %d): %s", tries, e)
+            try:
+                s.close()
+            except Exception:
+                pass
+            time.sleep(1)
+            if tries >= 5:
+                logger.warning("Continuando com tentativas contínuas para recriar socket UDP...")
+                time.sleep(5)
+
 
 # ---------------- FUNÇÃO PARA SALVAR PNG ----------------
 def salvar_grafico_png():
+    global historico_temperatura
     if not historico_temperatura:
         logger.warning("Não há dados para salvar.")
         return
 
+    # Prepara dados
     tempos, temperaturas = zip(*historico_temperatura)
     plt.figure(figsize=(10, 6))
     plt.plot(tempos, temperaturas, marker='o', linestyle='-', color='orange')
@@ -70,9 +112,16 @@ def salvar_grafico_png():
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"grafico_temperatura_{timestamp}.png"
 
-    plt.savefig(filename)
-    plt.close()
-    logger.info(f"Gráfico salvo como {filename}")
+    # Salva de forma segura
+    try:
+        tmpfile = filename + ".tmp"
+        plt.savefig(tmpfile)
+        plt.close()
+        shutil.move(tmpfile, filename)
+        logger.info("Gráfico salvo como %s", filename)
+    except Exception as e:
+        logger.exception("Falha ao salvar gráfico: %s", e)
+
 
 # ---------------- MODELO FÍSICO ----------------
 def atualizar_temperatura(motor_state_local, temp, dt=1.0):
@@ -108,6 +157,7 @@ def atualizar_temperatura(motor_state_local, temp, dt=1.0):
     temp = max(TEMP_MIN, min(TEMP_MAX, temp))
     return temp
 
+
 # ---------------- GUI ----------------
 @ui.page('/')
 def index():
@@ -142,7 +192,8 @@ def index():
                     chart.options['series'][0]['data'] = []
                     chart.options['xAxis']['data'] = []
                     chart.update()
-                    globals().update(temp_atual=40.0, phase="ciclo", alvo=30.0, start_time=time(), motor_state=1)
+                    # reset globals
+                    globals().update(temp_atual=40.0, phase="ciclo", alvo=30.0, start_time=time.time(), motor_state=1)
                 ui.button("🔄 Resetar Simulação", on_click=resetar, color="red")
 
             # ---------------- Sliders ----------------
@@ -169,6 +220,15 @@ def index():
             # ---------------- Ciclo principal ----------------
             def ciclo_simulacao():
                 global temp_atual, motor_state, ultimo_dado_motor, phase
+                global client, modbus_connected, sock, historico_temperatura
+
+                # Tenta reconectar Modbus se necessário
+                if not modbus_connected or client is None:
+                    logger.warning("Ligação Modbus não activa, a tentar reconectar...")
+                    new_client, ok = get_modbus_client()
+                    if new_client:
+                        client = new_client
+                    modbus_connected = ok
 
                 # Receber estado do motor via UDP
                 try:
@@ -177,28 +237,52 @@ def index():
                     motor_state = int(dado)
                     ultimo_dado_motor = dado
                 except BlockingIOError:
+                    # nenhum dado recebido — normal
                     pass
+                except OSError as e:
+                    # erro socket -> recriar
+                    logger.error("Erro UDP (OSError): %s — a recriar socket", e)
+                    try:
+                        sock.close()
+                    except Exception:
+                        pass
+                    sock = get_udp_socket()
                 except Exception as e:
-                    logger.error(f"Erro ao processar UDP: {e}")
+                    logger.exception("Erro ao processar UDP: %s", e)
+                    try:
+                        sock.close()
+                    except Exception:
+                        pass
+                    sock = get_udp_socket()
 
                 # Atualizar temperatura
                 temp_atual = atualizar_temperatura(motor_state, temp_atual, dt=READ_INTERVAL)
                 temp_enviar = round(temp_atual)
 
-                # Escrever no PLC
-                try:
-                    client.write_register(address=TEMP_REGISTER, value=temp_enviar, slave=1)
-                except Exception as e:
-                    logger.error("Falha ao escrever no PLC1: %s", e)
+                # Escrever no PLC (Modbus)
+                if client and modbus_connected:
+                    try:
+                        # usando write_register; captura falhas e força reconexão
+                        client.write_register(address=TEMP_REGISTER, value=temp_enviar, slave=1)
+                    except Exception as e:
+                        logger.error("Falha ao escrever no PLC1: %s", e)
+                        try:
+                            client.close()
+                        except Exception:
+                            pass
+                        client = None
+                        modbus_connected = False
+                else:
+                    logger.debug("Ignorando escrita Modbus porque não há ligação ativa")
 
                 # Atualizar labels
                 temp_label.set_text(f'🌡️ Temperatura: {temp_atual:.2f} ºC | 📤 Enviado: {temp_enviar} ºC')
                 estado_label.set_text(f'⚙️ Motor: {"ON" if motor_state else "OFF"} | Phase: {phase}')
                 clock_label.set_text(f'🕒 {datetime.now().strftime("%H:%M:%S")}')
-                debug_label.set_text(f"Último dado motor: {ultimo_dado_motor} | Tempo decorrido: {int(time()-start_time)}s")
+                debug_label.set_text(f"Último dado motor: {ultimo_dado_motor} | Tempo decorrido: {int(time.time()-start_time)}s")
 
                 # Atualizar gráfico
-                tempo_atual_s = int(time() - start_time)
+                tempo_atual_s = int(time.time() - start_time)
                 data_chart = chart.options['series'][0]['data']
                 x_data = chart.options['xAxis']['data']
 
@@ -218,7 +302,13 @@ def index():
 
             ui.timer(READ_INTERVAL, ciclo_simulacao)
 
+
 # ---------------- RUN ----------------
 if __name__ in {"__main__", "__mp_main__"}:
     logger.info("A arrancar PLC2 simulation (escreve no PLC1 %s:%s)", PLC1_IP, PLC1_PORT)
+
+    # Inicializa conexões com lógica de recuperação
+    client, modbus_connected = get_modbus_client()
+    sock = get_udp_socket()
+
     ui.run(port=8081, reload=False)
