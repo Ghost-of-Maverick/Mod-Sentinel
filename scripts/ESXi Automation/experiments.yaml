@@ -57,6 +57,6 @@ experiments:
   - name: modbus_reader_only
     description: "Passive Modbus reader"
     kali_attack: "/temp/run_scouting.sh"
-    pre_time: 2
-    attack_time: 2
-    post_time: 2
+    pre_time: 10
+    attack_time: 10
+    post_time: 10

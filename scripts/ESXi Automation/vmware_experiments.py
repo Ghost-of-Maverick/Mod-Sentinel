@@ -9,7 +9,7 @@ import os
 import shutil
 from typing import List, Dict, Any, Tuple, Optional
 from urllib.parse import urlparse, urlunparse
-
+from typing import Optional
 import requests
 from pyVim.connect import SmartConnect, Disconnect
 from pyVmomi import vim
@@ -172,12 +172,9 @@ def guest_start_background(si, vm, auth, shell_cmd: str, log_path: str = "/tmp/a
         return -1
 
     pidfile = "/tmp/attack.pid"
-    # escape single quotes in shell_cmd
     esc = _escape_single_quotes_for_bash(shell_cmd)
-    # launcher: nohup bash -lc '<shell_cmd>' > log 2>&1 & echo $! > pidfile
-    # we pass the whole launcher as bash -c "...", so we must ensure proper quoting
-    launcher_cmd_text = f"nohup bash -c '{esc}' > {log_path} 2>&1 & echo $! > {pidfile}"
-    # Now pass launcher_cmd_text as a single argument to /bin/bash -c (again escape)
+    # Corrigido: cd + exec para substituir o shell pelo script
+    launcher_cmd_text = f"nohup bash -lc '{esc}' > {log_path} 2>&1 & echo $! > {pidfile}"
     launcher_text_esc = _escape_single_quotes_for_bash(launcher_cmd_text)
     final_args = f"-c '{launcher_text_esc}'"
     spec = vim.vm.guest.ProcessManager.ProgramSpec(programPath="/bin/bash", arguments=final_args)
@@ -246,7 +243,7 @@ def countdown_minutes(minutes: int, label: str):
 
 def print_header():
     print(BOLD + "="*72 + RESET)
-    print(f"{BOLD}VMware Experiments — Orquestrador (UI melhorada){RESET}")
+    print(f"{BOLD}VMware Experiments — Orquestrador{RESET}")
     print(BOLD + "="*72 + RESET)
 
 def show_vms_status(content, cfg_vms: List[Dict[str,Any]]):
@@ -276,20 +273,23 @@ def revert_to_snapshot_all(content, vm_entries: List[Dict[str,Any]]):
             wait_for_task(vm.PowerOn(), label=f"PowerOn {vm.name}")
         time.sleep(1)
 
-def ensure_tools_for_vm(content, vm_name: str, timeout_sec: int = 120) -> bool:
-    info(f"A aguardar VMware Tools em {vm_name} (timeout {timeout_sec}s)...")
+def ensure_tools_for_vm(vm: vim.VirtualMachine, timeout_sec: int = 120) -> bool:
+    info(f"A aguardar VMware Tools em {vm.name} (timeout {timeout_sec}s)...")
     start = time.time()
     while time.time() - start < timeout_sec:
-        try:
-            vm = find_vm_by_name(content, vm_name)   # re-obtem a VM
-            status = getattr(vm.guest, "toolsRunningStatus", None)
-            if status == "guestToolsRunning":
-                info(f"VMware Tools running em {vm_name}")
-                return True
-        except Exception as e:
-            warn(f"Erro ao obter estado Tools de {vm_name}: {e}")
+        status = getattr(vm.guest, "toolsRunningStatus", None)
+        if status == "guestToolsRunning":
+            info(f"VMware Tools running em {vm.name}")
+            return True
         time.sleep(2)
-    warn(f"VMware Tools NÃO ficou running em {vm_name} após {timeout_sec}s")
+        # refresh vm runtime/guest info
+        try:
+            # re-obter objeto VM para atualizar estados
+            # (este passo depende da API; se 'vm' já for dinâmico pode nem ser necessário)
+            pass
+        except Exception:
+            pass
+    warn(f"VMware Tools NÃO ficou running em {vm.name} após {timeout_sec}s")
     return False
 
 def ensure_tools_for_all(content, vm_entries: List[Dict[str, Any]]):
@@ -308,6 +308,27 @@ def ensure_tools_for_all(content, vm_entries: List[Dict[str, Any]]):
         if not ok:
             warn(f"{vm.name}: prosseguindo apesar do VMware Tools não estar running (poderá falhar operações in-guest)")
 
+# ---------------- GUI alert box (terminal) ---------------- #
+
+def gui_alert(title: str, msg: str, width: Optional[int] = None):
+    lines = msg.splitlines() or [""]
+    max_line = max(len(l) for l in lines)
+    min_width = max(len(title) + 4, max_line + 4, 40)
+    w = width if (width and width > min_width) else min_width
+
+    print()
+    print(YELLOW + BOLD + "+" + "-" * (w - 2) + "+" + RESET)
+    title_text = f" {title} "
+    print(YELLOW + "|" + title_text.center(w - 2) + "|" + RESET)
+    print(YELLOW + "+" + "-" * (w - 2) + "+" + RESET)
+
+    for l in lines:
+        if len(l) > w - 4:
+            l = l[:w - 7] + "..."
+        print(YELLOW + "| " + l.ljust(w - 4) + " |" + RESET)
+
+    print(YELLOW + "+" + "-" * (w - 2) + "+" + RESET)
+    print()
 
 def run_experiment(si, content, cfg: Dict[str,Any], exp: Dict[str,Any]):
     vms = cfg.get("vms", [])
@@ -323,9 +344,25 @@ def run_experiment(si, content, cfg: Dict[str,Any], exp: Dict[str,Any]):
     revert_to_snapshot_all(content, vms)
 
     # 1a) garantir VMware Tools nas VMs (ESSENCIAL)
+        # 1a) garantir VMware Tools nas VMs (ESSENCIAL)
     ensure_tools_for_all(content, vms)
-
     show_vms_status(content, vms)
+
+    # se alguma VM ainda não tiver Tools, reforçar aviso aqui também
+    bad_vms = [v["name"] for v in vms
+               if getattr(find_vm_by_name(content, v["name"]).guest, "toolsRunningStatus", None) != "guestToolsRunning"]
+    if bad_vms:
+        warn(f"As seguintes VMs continuam sem VMware Tools: {', '.join(bad_vms)}. "
+             "\nProsseguindo, mas operações in-guest podem falhar.")
+        gui_alert(
+            title="POSSÍVEL VM FROZEN",
+            msg=(
+                f"As VMs {', '.join(bad_vms)} não têm VMware Tools running.\n\n"
+                "As experiências vão prosseguir, mas comandos in-guest e transferências "
+                "podem falhar nessas VMs.\n"
+                "Verifique-as manualmente se necessário ou aguarde."
+            )
+        )
 
     # confirm
     note(f"About to run experiment '{exp['name']}'")
@@ -384,12 +421,13 @@ def run_experiment(si, content, cfg: Dict[str,Any], exp: Dict[str,Any]):
             info("Interrupt during attack wait; proceeding to stop attack")
 
         info("Stopping attack process (PID kill + fallback pkill)...")
-        safe_pattern = attack_cmd_expanded.replace('"', '\\"')
+        safe_pattern = os.path.basename(attack_cmd_expanded)  # apenas o nome do script
         stop_cmd = (
-            "pid=$(cat /tmp/attack.pid 2>/dev/null || echo ''); "
-            "if [ -n \"$pid\" ]; then kill \"$pid\" 2>/dev/null || true; sleep 2; kill -0 \"$pid\" 2>/dev/null && pkill -f \"{p}\" || true; "
-            "else pkill -f \"{p}\" || true; fi"
-        ).format(p=safe_pattern)
+            f"pid=$(cat /tmp/attack.pid 2>/dev/null || echo ''); "
+            f"if [ -n \"$pid\" ]; then kill \"$pid\" 2>/dev/null || true; "
+            f"else pkill -f \"{safe_pattern}\" || true; fi"
+        )
+
         guest_run(si, kali_vm, kali_auth, ["/bin/bash", stop_cmd], timeout_sec=30, label="attack_stop")
         # retrieve attack log
         guest_download(si, kali_vm, kali_auth, "/tmp/attack.out", os.path.join(runs_dir, "attack.out"))
@@ -445,7 +483,6 @@ def main():
 
     si = None
     try:
-        print_header = lambda: (print(BOLD + "="*72 + RESET), print(f"{BOLD}VMware Experiments — Orquestrador{RESET}"), print(BOLD + "="*72 + RESET))
         print_header()
         si = esxi_connect(args.esxi, args.user, args.password, args.insecure)
         content = si.RetrieveContent()
@@ -457,30 +494,45 @@ def main():
         vms = cfg.get("vms", [])
         show_vms_status(content, vms)
 
-        print("\n" + BOLD + "Experiments available:" + RESET)
-        for i, e in enumerate(experiments, start=1):
-            desc = e.get("description", "")
-            print(f"  {i}) {e['name']:<30} - {desc}")
-        print("  0) quit")
-        sel = input("\nChoose experiment number or name: ").strip()
-        if sel == "0":
-            info("Exit"); return
-        chosen = None
-        if sel.isdigit():
-            idx = int(sel) - 1
-            if idx < 0 or idx >= len(experiments):
-                die("Invalid selection")
-            chosen = experiments[idx]
-        else:
-            for e in experiments:
-                if e['name'] == sel:
-                    chosen = e
-                    break
-            if not chosen:
-                die("Invalid selection")
+        # menu loop
+        while True:
+            print("\n" + BOLD + "Experiments available:" + RESET)
+            for i, e in enumerate(experiments, start=1):
+                desc = e.get("description", "")
+                print(f"  {i}) {e['name']:<30} - {desc}")
+            print("  A) Run ALL experiments")
+            print("  S) Show VM status")
+            print("  0) Quit")
 
-        info(f"Running: {chosen['name']} — {chosen.get('description','')}")
-        run_experiment(si, content, cfg, chosen)
+            sel = input("\nChoose experiment number, name, or option: ").strip()
+            if sel.lower() in ("0", "q", "quit", "exit"):
+                info("Exit")
+                break
+            elif sel.lower() in ("a", "all"):
+                info("Running ALL experiments sequentially...")
+                for exp in experiments:
+                    info(f"\n--- Running: {exp['name']} ---")
+                    run_experiment(si, content, cfg, exp)
+                info("All experiments finished.")
+            elif sel.lower() in ("s", "status"):
+                show_vms_status(content, vms)
+            else:
+                chosen = None
+                if sel.isdigit():
+                    idx = int(sel) - 1
+                    if 0 <= idx < len(experiments):
+                        chosen = experiments[idx]
+                else:
+                    for e in experiments:
+                        if e['name'].lower() == sel.lower():
+                            chosen = e
+                            break
+                if not chosen:
+                    warn("Invalid selection, try again.")
+                    continue
+
+                info(f"Running: {chosen['name']} — {chosen.get('description','')}")
+                run_experiment(si, content, cfg, chosen)
 
     except Exception as e:
         die(str(e))
