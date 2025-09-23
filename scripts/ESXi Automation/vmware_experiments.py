@@ -14,6 +14,7 @@ import requests
 from pyVim.connect import SmartConnect, Disconnect
 from pyVmomi import vim
 from sympy import content
+import base64
 
 try:
     import yaml  # type: ignore
@@ -166,26 +167,212 @@ def guest_run(si, vm, auth, command: List[str], timeout_sec: int = 0, label: str
 
         time.sleep(poll)
 
-def guest_start_background(si, vm, auth, shell_cmd: str, log_path: str = "/tmp/attack.out") -> int:
+def guest_start_background(si, vm, auth, shell_cmd: str,
+                          log_path: str = "/tmp/attack.out",
+                          pidfile: str = "/tmp/attack.pid",
+                          pidfile_wait_sec: int = 8) -> int:
     if vm.guest.toolsRunningStatus != 'guestToolsRunning':
         warn(f"[{vm.name}] VMware Tools not running -> start_background skipped")
         return -1
 
-    pidfile = "/tmp/attack.pid"
-    esc = _escape_single_quotes_for_bash(shell_cmd)
-    # Corrigido: cd + exec para substituir o shell pelo script
-    launcher_cmd_text = f"nohup bash -lc '{esc}' > {log_path} 2>&1 & echo $! > {pidfile}"
-    launcher_text_esc = _escape_single_quotes_for_bash(launcher_cmd_text)
-    final_args = f"-c '{launcher_text_esc}'"
+    # Normalize guest command path (if relative assume /temp/)
+    cmd_in_guest = shell_cmd
+    if cmd_in_guest.startswith("~/"):
+        cmd_in_guest = cmd_in_guest.replace("~/", "/")
+    if not cmd_in_guest.startswith("/"):
+        cmd_in_guest = f"/temp/{cmd_in_guest}"
+
+    # Compose inner command to run wrapper (wrapper will create pidfile & log)
+    inner = (
+        "cd /temp || exit 1; "
+        f"nohup /temp/run_attack_wrapper.sh {cmd_in_guest} > {log_path} 2>&1 & "
+        "sleep 0.05; "
+        # attempt to print pidfile (non-fatal)
+        f"cat {pidfile} 2>/dev/null || true"
+    )
+
+    escaped_inner = inner.replace('"', '\\"')
+    final_args = f'-lc "{escaped_inner}"'
     spec = vim.vm.guest.ProcessManager.ProgramSpec(programPath="/bin/bash", arguments=final_args)
     pm = si.content.guestOperationsManager.processManager
+
     try:
         launcher_pid = pm.StartProgramInGuest(vm, auth, spec)
         info(f"[{vm.name}] background launcher started (launcher_pid={launcher_pid}, pidfile={pidfile})")
-        return launcher_pid
     except Exception as e:
         warn(f"[{vm.name}] guest_start_background falhou: {e}")
         return -1
+
+    # Poll for pidfile presence by attempting guest_download (small timeout)
+    start = time.time()
+    local_tmp = os.path.join(".", "runs", f"pidcheck_{vm.name}_{now_ts()}.pid")
+    while time.time() - start < pidfile_wait_sec:
+        try:
+            # try to download pidfile; guest_download returns True/False
+            ok = guest_download(si, vm, auth, pidfile, local_tmp)
+            if ok:
+                try:
+                    with open(local_tmp, "r") as f:
+                        pcontent = [l.strip() for l in f if l.strip()]
+                    info(f"[{vm.name}] pidfile found with {len(pcontent)} lines: {pcontent}")
+                except Exception:
+                    info(f"[{vm.name}] pidfile downloaded but failed to read locally")
+                # keep the downloaded pidfile for debugging
+                return int(launcher_pid)
+        except Exception:
+            pass
+        time.sleep(0.25)
+
+    warn(f"[{vm.name}] pidfile {pidfile} not seen after {pidfile_wait_sec}s (wrapper may be slower).")
+    return int(launcher_pid)
+
+def guest_stop_by_pidfile(si, vm, auth, pidfile: str = "/tmp/attack.pid",
+                         script_path: str = None, timeout_sec: int = 30,
+                         label: str = "attack_stop") -> Tuple[int, int]:
+
+    # Prepare safe fallback patterns
+    safe_pattern = ""
+    basename = ""
+    if script_path:
+        safe_pattern = script_path.replace('"', '\\"')
+        basename = os.path.basename(script_path)
+
+    # Build the shell script we will write and run on the guest.
+    # Keep it plain, with clear logging to /tmp/attack.stop.log
+    guest_script = f"""#!/bin/bash
+LOG=/tmp/attack.stop.log
+echo "STOP SCRIPT START $(date '+%Y-%m-%d %H:%M:%S')" > "$LOG"
+echo "pidfile: {pidfile}" >> "$LOG"
+FOUND=0
+
+# function to attempt stop of a pid
+stop_pid() {{
+  p="$1"
+  echo "checking pid $p" >> "$LOG"
+  if [ -d /proc/$p ]; then
+    # optional safety: check cmdline contains basename if provided
+    if [ -n "{basename}" ]; then
+      cmd=$(tr '\\0' ' ' < /proc/$p/cmdline 2>/dev/null || true)
+      echo "cmdline: $cmd" >> "$LOG"
+      if ! echo \"$cmd\" | grep -F -- "{basename}" >/dev/null 2>&1; then
+        echo "pid $p cmdline does not match basename {basename}, skipping" >> "$LOG"
+        return 1
+      fi
+    fi
+    echo "Attempting pkill -TERM -P $p (children)" >> "$LOG"
+    pkill -TERM -P "$p" 2>/dev/null || true
+    echo "Attempting kill -TERM $p" >> "$LOG"
+    kill -TERM "$p" 2>/dev/null || true
+    sleep 1
+    if kill -0 "$p" 2>/dev/null; then
+      echo "pid $p still alive, escalating to KILL and pkill -KILL -P" >> "$LOG"
+      pkill -KILL -P "$p" 2>/dev/null || true
+      kill -KILL "$p" 2>/dev/null || true
+      sleep 0.1
+    fi
+    if kill -0 "$p" 2>/dev/null; then
+      echo "pid $p still present after escalation" >> "$LOG"
+      return 2
+    else
+      echo "pid $p terminated" >> "$LOG"
+      FOUND=1
+      return 0
+    fi
+  else
+    echo "pid $p not present" >> "$LOG"
+    return 1
+  fi
+}}
+
+# If pidfile exists, try using it
+if [ -f "{pidfile}" ]; then
+  echo "Reading pidfile {pidfile}" >> "$LOG"
+  while IFS= read -r p || [ -n "$p" ]; do
+    p="$(echo $p | tr -d '\\r\\n')"
+    if [ -n "$p" ]; then
+      stop_pid "$p" || true
+    fi
+  done < "{pidfile}"
+  # remove pidfile to avoid future confusion
+  rm -f "{pidfile}" 2>/dev/null || true
+else
+  echo "pidfile {pidfile} not found" >> "$LOG"
+fi
+
+# fallback: pkill by full path and basename if provided
+if [ -n "{safe_pattern}" ]; then
+  echo "Fallback: pkill -TERM -f \"{safe_pattern}\"" >> "$LOG"
+  pkill -TERM -f "{safe_pattern}" 2>/dev/null || true
+  echo "Fallback: pkill -TERM -f \"{basename}\"" >> "$LOG"
+  pkill -TERM -f "{basename}" 2>/dev/null || true
+  sleep 1
+  echo "Fallback escalate: KILL patterns" >> "$LOG"
+  pkill -KILL -f "{safe_pattern}" 2>/dev/null || true
+  pkill -KILL -f "{basename}" 2>/dev/null || true
+else
+  echo "No safe_pattern provided - generic fallback (wrapper & script names)" >> "$LOG"
+  pkill -TERM -f "/temp/run_attack_wrapper.sh" 2>/dev/null || true
+  pkill -TERM -f "run_scouting.sh" 2>/dev/null || true
+  sleep 1
+  pkill -KILL -f "/temp/run_attack_wrapper.sh" 2>/dev/null || true
+  pkill -KILL -f "run_scouting.sh" 2>/dev/null || true
+fi
+
+# Final listing for debug
+echo "Remaining pgrep -af {basename}:" >> "$LOG"
+pgrep -af "{basename}" >> "$LOG" 2>/dev/null || echo "no process match" >> "$LOG"
+
+echo "STOP SCRIPT END $(date '+%Y-%m-%d %H:%M:%S')" >> "$LOG"
+# always exit 0 so the launcher indicates success (we log internal failures)
+exit 0
+"""
+
+    # base64 encode the script to avoid any quoting issues when sending
+    b64 = base64.b64encode(guest_script.encode("utf-8")).decode("ascii")
+    # build the command: decode base64 -> /tmp/stop_attack.sh ; chmod +x ; run it
+    cmd = f"printf '%s' '{b64}' | base64 -d > /tmp/stop_attack.sh && chmod +x /tmp/stop_attack.sh && /tmp/stop_attack.sh; rc=$?; rm -f /tmp/stop_attack.sh || true; exit $rc"
+
+    # prepare ProgramSpec - use -lc so shell meta works
+    escaped = cmd.replace('"', '\\"')
+    args = f'-lc "{escaped}"'
+    spec = vim.vm.guest.ProcessManager.ProgramSpec(programPath="/bin/bash", arguments=args)
+    pm = si.content.guestOperationsManager.processManager
+
+    try:
+        stop_launcher_pid = pm.StartProgramInGuest(vm, auth, spec)
+        info(f"[{vm.name}:{label}] stop launcher started (pid={stop_launcher_pid})")
+    except Exception as e:
+        warn(f"[{vm.name}:{label}] StartProgramInGuest falhou para stop_cmd: {e}")
+        return (-1, 0)
+
+    # poll the launcher process until it exits or timeout
+    start_ts = time.time()
+    poll = 1
+    while True:
+        try:
+            procs = pm.ListProcessesInGuest(vm, auth, [stop_launcher_pid])
+        except Exception as e:
+            warn(f"[{vm.name}:{label}] ListProcessesInGuest erro (retry): {e}")
+            time.sleep(poll)
+            continue
+
+        if not procs:
+            dur = int(time.time() - start_ts)
+            info(f"[{vm.name}:{label}] stop launcher not found (exited quickly) dur={dur}s")
+            return (0, dur)
+
+        p = procs[0]
+        if getattr(p, "endTime", None) is not None:
+            rc = int(getattr(p, "exitCode", 0) or 0)
+            dur = int(time.time() - start_ts)
+            info(f"[{vm.name}:{label}] finished pid={stop_launcher_pid} exit={rc} dur={dur}s")
+            return (rc, dur)
+
+        if timeout_sec and (time.time() - start_ts) > timeout_sec:
+            warn(f"[{vm.name}:{label}] timeout after {timeout_sec}s (stop launcher may continue in guest)")
+            return (-1, int(time.time() - start_ts))
+
+        time.sleep(poll)
 
 def guest_download(si, vm, auth, guest_path: str, local_path: str) -> bool:
     fm = si.content.guestOperationsManager.fileManager
@@ -306,7 +493,7 @@ def ensure_tools_for_all(content, vm_entries: List[Dict[str, Any]]):
             continue
         ok = ensure_tools_for_vm(vm, timeout_sec=timeout)
         if not ok:
-            warn(f"{vm.name}: prosseguindo apesar do VMware Tools não estar running (poderá falhar operações in-guest)")
+            warn(f"{vm.name}: prosseguindo apesar do VMware Tools não estar running")
 
 # ---------------- GUI alert box (terminal) ---------------- #
 
@@ -399,40 +586,105 @@ def run_experiment(si, content, cfg: Dict[str,Any], exp: Dict[str,Any]):
     except KeyboardInterrupt:
         info("Interrupt received — aborting experiment early")
 
-    # 4) attack: background from /temp
+     # 4) attack: background from /temp
     attack_cmd = exp.get("kali_attack")
     attack_min = int(exp.get("attack_time", 20))
     runs_dir = os.path.join(".", "runs", f"{exp['name']}_{now_ts()}")
     os.makedirs(runs_dir, exist_ok=True)
 
-    if attack_cmd:
+    if not attack_cmd:
+        warn("No kali_attack defined; skipping attack phase")
+    else:
         info(f"Starting attack (background) from /temp: {attack_cmd} ({attack_min} minutes)")
-        # normalize: if relative, assume /temp/<attack_cmd>
-        attack_cmd_expanded = attack_cmd
-        if attack_cmd_expanded.startswith("~/"):
-            attack_cmd_expanded = attack_cmd_expanded.replace("~/", "/")
-        if not attack_cmd_expanded.startswith("/"):
-            attack_cmd_expanded = f"/temp/{attack_cmd_expanded}"
-        # start attack in background (pid -> /tmp/attack.pid, log -> /tmp/attack.out)
-        guest_start_background(si, kali_vm, kali_auth, f"cd /temp && {attack_cmd_expanded}", log_path="/tmp/attack.out")
+
+        # normalizar path: se relativo, assumir /temp/<attack_cmd>
+        if attack_cmd.startswith("~/"):
+            attack_cmd_expanded = attack_cmd.replace("~/", "/")
+        elif not attack_cmd.startswith("/"):
+            attack_cmd_expanded = f"/temp/{attack_cmd}"
+        else:
+            attack_cmd_expanded = attack_cmd
+
+        pidfile = "/tmp/attack.pid"
+        logfile = "/tmp/attack.out"
+
+        # iniciar ataque em background via wrapper; aguarda um pouco pelo pidfile
+        launcher_pid = guest_start_background(
+            si,
+            kali_vm,
+            kali_auth,
+            attack_cmd_expanded,
+            log_path=logfile,
+            pidfile=pidfile
+        )
+        if launcher_pid == -1:
+            warn("guest_start_background falhou a lançar o wrapper (prosseguindo, mas poderá não correr).")
+
         try:
             countdown_minutes(attack_min, "ATTACK")
         except KeyboardInterrupt:
             info("Interrupt during attack wait; proceeding to stop attack")
 
-        info("Stopping attack process (PID kill + fallback pkill)...")
-        safe_pattern = os.path.basename(attack_cmd_expanded)  # apenas o nome do script
-        stop_cmd = (
-            f"pid=$(cat /tmp/attack.pid 2>/dev/null || echo ''); "
-            f"if [ -n \"$pid\" ]; then kill \"$pid\" 2>/dev/null || true; "
-            f"else pkill -f \"{safe_pattern}\" || true; fi"
+        info("Stopping attack process using robust stop (pidfile + fallback pkill)...")
+
+        # parar ataque com função robusta (usa pidfile se existir, senão fallback por nome)
+        rc_stop, dur = guest_stop_by_pidfile(
+            si,
+            kali_vm,
+            kali_auth,
+            pidfile=pidfile,
+            script_path=attack_cmd_expanded,
+            timeout_sec=30,
+            label="attack_stop"
         )
 
-        guest_run(si, kali_vm, kali_auth, ["/bin/bash", stop_cmd], timeout_sec=30, label="attack_stop")
-        # retrieve attack log
-        guest_download(si, kali_vm, kali_auth, "/tmp/attack.out", os.path.join(runs_dir, "attack.out"))
-    else:
-        warn("No kali_attack defined; skipping attack phase")
+        # sempre tentar obter o log de stop para diagnóstico
+        try:
+            guest_download(si, kali_vm, kali_auth, "/tmp/attack.stop.log",
+                           os.path.join(runs_dir, "attack.stop.log"))
+            info(f"Downloaded stop log -> {os.path.join(runs_dir, 'attack.stop.log')}")
+        except Exception as e:
+            warn(f"Could not download /tmp/attack.stop.log: {e}")
+
+        if rc_stop != 0:
+            warn(f"Stop launcher devolveu código {rc_stop} (dur={dur}s). Verifica o estado no guest.")
+
+            # 2ª tentativa: forçar fallback (sem pidfile) — útil se pidfile desapareceu ou PIDs mudaram
+            warn("Attempting fallback stop (no pidfile) ...")
+            rc_fb, dur_fb = guest_stop_by_pidfile(
+                si,
+                kali_vm,
+                kali_auth,
+                pidfile=None,
+                script_path=attack_cmd_expanded,
+                timeout_sec=45,
+                label="attack_stop_fallback"
+            )
+
+            if rc_fb != 0:
+                warn(f"Fallback stop também devolveu código {rc_fb} (dur={dur_fb}s). Verifica /tmp/attack.stop.log no guest.")
+            else:
+                info(f"Fallback stop completed successfully (dur={dur_fb}s)")
+        else:
+            info(f"Stop launcher completed successfully (dur={dur}s)")
+
+                # sempre tentar obter o log de stop para diagnóstico
+        try:
+            guest_download(si, kali_vm, kali_auth, "/tmp/attack.stop.log",
+                           os.path.join(runs_dir, "attack.stop.log"))
+            info(f"Downloaded stop log -> {os.path.join(runs_dir, 'attack.stop.log')}")
+        except Exception as e:
+            warn(f"Could not download /tmp/attack.stop.log: {e}")
+
+        try:
+            ok_attack_log = guest_download(si, kali_vm, kali_auth, logfile,
+                                           os.path.join(runs_dir, "attack.out"))
+            if ok_attack_log:
+                info(f"Downloaded attack log -> {os.path.join(runs_dir, 'attack.out')}")
+            else:
+                warn(f"attack log {logfile} not found or download failed")
+        except Exception as e:
+            warn(f"Could not download {logfile}: {e}")
 
     # 5) post_time
     post = int(exp.get("post_time", 10))
@@ -471,6 +723,91 @@ def run_experiment(si, content, cfg: Dict[str,Any], exp: Dict[str,Any]):
 
     info(f"Experiment '{exp['name']}' finished. Results in: {os.path.abspath(runs_dir)}")
 
+def run_experiment_no_attack(si, content, cfg: Dict[str,Any], exp: Dict[str,Any], duration_min: int = 30):
+    vms = cfg.get("vms", [])
+    vm_map = {v["name"]: find_vm_by_name(content, v["name"]) for v in vms}
+    kali_entry = next((v for v in vms if v["name"].lower().startswith("kali")), None)
+    if not kali_entry:
+        die("Kali VM not found in YAML (name must start with 'kali')")
+    kali_vm = vm_map[kali_entry["name"]]
+    kali_auth = guest_auth(kali_entry["guest_user"], kali_entry["guest_pass"])
+
+    # 1) revert and status
+    info("Reverting all VMs to base snapshots...")
+    revert_to_snapshot_all(content, vms)
+
+    ensure_tools_for_all(content, vms)
+    show_vms_status(content, vms)
+
+    bad_vms = [v["name"] for v in vms
+               if getattr(find_vm_by_name(content, v["name"]).guest, "toolsRunningStatus", None) != "guestToolsRunning"]
+    if bad_vms:
+        warn(f"As seguintes VMs continuam sem VMware Tools: {', '.join(bad_vms)}. "
+             "\nProsseguindo, mas operações in-guest podem falhar.")
+        gui_alert(
+            title="POSSÍVEL VM FROZEN",
+            msg=(f"As VMs {', '.join(bad_vms)} não têm VMware Tools running.\n\n"
+                 "As experiências vão prosseguir, mas comandos in-guest e transferências "
+                 "podem falhar nessas VMs.\n"
+                 "Verifique-as manualmente se necessário ou aguarde.")
+        )
+
+    note(f"About to run NO-ATTACK experiment '{exp['name']}' for {duration_min} minutes")
+    ok = input("Proceed? (y/N): ").strip().lower()
+    if ok != "y":
+        info("Aborted by user")
+        return
+
+    # Start sentinel
+    info("Starting Mod-Sentinel on Kali (start command)...")
+    SENTINEL_DIR = "/Mod-Sentinel"
+    start_cmd_text = f"cd {SENTINEL_DIR} && python3 main.py start"
+    rc, _ = guest_run(si, kali_vm, kali_auth, ["/bin/bash", start_cmd_text], timeout_sec=60, label="sentinel_start")
+    if rc != 0:
+        warn("Sentinel start command retornou não-zero. Verifica logs do sentinel no guest para diagnóstico.")
+    else:
+        info("Sentinel start command issued (verifica logs do sentinel).")
+
+    # create run dir early so logs have place to go
+    runs_dir = os.path.join(".", "runs", f"{exp['name']}_{now_ts()}")
+    os.makedirs(runs_dir, exist_ok=True)
+
+    # Wait the desired duration
+    try:
+        countdown_minutes(duration_min, "NO-ATTACK")
+    except KeyboardInterrupt:
+        info("Interrupt received — proceeding to stop sentinel")
+
+    # Stop sentinel and collect logs (same as existing logic)
+    info("Stopping Mod-Sentinel and collecting logs...")
+    try:
+        guest_run(si, kali_vm, kali_auth, ["/bin/bash", f"cd {SENTINEL_DIR} && python3 main.py stop"], timeout_sec=120, label="sentinel_stop")
+    except Exception as e:
+        warn(f"Stopping sentinel failed: {e}")
+
+    remote_tgz = f"/tmp/modsentinel_{exp['name']}_{now_ts()}.tgz"
+    try:
+        guest_run(si, kali_vm, kali_auth, ["/bin/bash", f"cd {SENTINEL_DIR} && tar -czf {remote_tgz} logs"], timeout_sec=120, label="tar_logs")
+        local_tgz = os.path.join(runs_dir, os.path.basename(remote_tgz))
+        ok = guest_download(si, kali_vm, kali_auth, remote_tgz, local_tgz)
+        if ok:
+            try:
+                shutil.unpack_archive(local_tgz, runs_dir)
+                info(f"Logs extracted to {runs_dir}")
+            except Exception:
+                info(f"Saved logs tar -> {local_tgz}")
+        else:
+            warn("Failed to download sentinel logs")
+        # cleanup remote tar
+        try:
+            guest_run(si, kali_vm, kali_auth, ["/bin/bash", f"rm -f {remote_tgz}"], timeout_sec=10, label="rm_tgz")
+        except Exception:
+            pass
+    except Exception as e:
+        warn(f"Could not create/download sentinel logs: {e}")
+
+    info(f"NO-ATTACK experiment '{exp['name']}' finished. Results in: {os.path.abspath(runs_dir)}")
+
 # ---------------- CLI / Menu / Signal ---------------- #
 def main():
     ap = argparse.ArgumentParser(description="Orquestrador simplificado para ESXi (experiências)")
@@ -501,6 +838,7 @@ def main():
                 desc = e.get("description", "")
                 print(f"  {i}) {e['name']:<30} - {desc}")
             print("  A) Run ALL experiments")
+            print("  N) Run experiment WITHOUT attack")
             print("  S) Show VM status")
             print("  0) Quit")
 
@@ -516,6 +854,34 @@ def main():
                 info("All experiments finished.")
             elif sel.lower() in ("s", "status"):
                 show_vms_status(content, vms)
+            elif sel.lower() in ("n", "noattack", "no-attack"):
+                # Perguntar duração em minutos (default 30)
+                dur_in = input("Duração em minutos (default 30): ").strip()
+                if dur_in == "":
+                    duration = 30
+                else:
+                    try:
+                        duration = int(dur_in)
+                        if duration <= 0:
+                            warn("Duração inválida. Usando 30 minutos.")
+                            duration = 30
+                    except Exception:
+                        warn("Entrada inválida. Usando 30 minutos.")
+                        duration = 30
+
+                # Criar "experiência" fake só para nome e organização
+                timestamp = now_ts()
+                fake_exp = {
+                    "name": f"no_attack_{timestamp}",
+                    "description": f"Run sem ataque por {duration} minutos",
+                    "pre_time": 0,
+                    "attack_time": 0,
+                    "post_time": duration  # usamos post_time para esperar a duração
+                }
+
+                info(f"Running NO-ATTACK: {fake_exp['name']} — {fake_exp['description']}")
+                run_experiment_no_attack(si, content, cfg, fake_exp, duration_min=duration)
+
             else:
                 chosen = None
                 if sel.isdigit():

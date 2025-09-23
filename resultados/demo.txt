@@ -1,1 +1,0 @@
-A incluir ficheiros CSV retirados da execução do script de automação no ESXi
