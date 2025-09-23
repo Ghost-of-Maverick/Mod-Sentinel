@@ -31,6 +31,8 @@ K_RECUP = 0.03      # recuperação pós-ataque
 
 READ_INTERVAL = 1.0  # segundos
 
+RUIDO = 0.0  # intensidade do ruído (slider controla isto)
+
 # ---------------- ESTADO ----------------
 temp_atual = 40.0
 motor_state = 1          # motor ON por defeito
@@ -114,7 +116,7 @@ def salvar_grafico_png():
 
     # Salva de forma segura
     try:
-        tmpfile = filename + ".tmp"
+        tmpfile = filename + ".tmp.png"
         plt.savefig(tmpfile)
         plt.close()
         shutil.move(tmpfile, filename)
@@ -125,11 +127,10 @@ def salvar_grafico_png():
 
 # ---------------- MODELO FÍSICO ----------------
 def atualizar_temperatura(motor_state_local, temp, dt=1.0):
-    global phase, alvo, K_CYCLE, K_CRITICO, K_RECUP
+    global phase, alvo, K_CYCLE, K_CRITICO, K_RECUP, RUIDO
 
     if motor_state_local == 1:
         if phase in ["ataque", "recuperacao"]:
-            # recuperação depois de ataque
             phase = "recuperacao"
             delta = (alvo - temp) * (1 - math.exp(-K_RECUP * dt))
             temp += delta
@@ -137,22 +138,23 @@ def atualizar_temperatura(motor_state_local, temp, dt=1.0):
                 phase = "ciclo"
                 alvo = random.uniform(29.5, 31.5) if temp > 35 else random.uniform(40.0, 43.0)
         else:
-            # ciclo normal motor ON
             phase = "ciclo"
             delta = (alvo - temp) * (1 - math.exp(-K_CYCLE * dt))
             temp += delta
             if abs(temp - alvo) < 0.3:
-                # escolhe novo alvo aleatório
                 if alvo < 35:
                     alvo = random.uniform(40.0, 43.0)
                 else:
                     alvo = random.uniform(29.5, 31.5)
 
     else:
-        # motor OFF inesperado (ataque) → subida contínua
         phase = "ataque"
-        ganho = 1 + random.uniform(-0.1, 0.1)  # ruído leve
+        ganho = 1 + random.uniform(-0.1, 0.1)
         temp += K_CRITICO * dt * ganho
+
+    # Adiciona ruído controlado pelo slider
+    if RUIDO > 0:
+        temp += random.uniform(-RUIDO, RUIDO)
 
     temp = max(TEMP_MIN, min(TEMP_MAX, temp))
     return temp
@@ -216,6 +218,12 @@ def index():
                     ui.slider(min=0.01, max=0.1, value=K_RECUP, step=0.002,
                               on_change=lambda e: globals().update(K_RECUP=e.value)) \
                       .props("label-always")
+                
+                with ui.row():
+                    ui.label("Ruído")
+                    ui.slider(min=0.0, max=2.0, value=RUIDO, step=0.1,
+                            on_change=lambda e: globals().update(RUIDO=e.value)) \
+                    .props("label-always")
 
             # ---------------- Ciclo principal ----------------
             def ciclo_simulacao():
