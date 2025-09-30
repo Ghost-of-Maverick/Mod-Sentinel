@@ -1,28 +1,28 @@
 #!/usr/bin/env bash
-# /temp/run_attack_wrapper.sh <command>
-# Wrapper tested by you: starts command under nohup+setsid, writes pidfile with
-# the launcher PID and all descendant PIDs (one per linha).
+# /temp/run_attack_wrapper.sh <command> [args...]
+# Wrapper: starts command under nohup+setsid, writes pidfile with
+# the launcher PID and all descendant PIDs (one per line).
 
-TARGET="$1"
 PIDFILE="/tmp/attack.pid"
 LOGFILE="/tmp/attack.out"
 
-if [ -z "$TARGET" ]; then
-  echo "Usage: $0 /path/to/script-or-cmd" >&2
+# require at least one argument (command)
+if [ $# -eq 0 ]; then
+  echo "Usage: $0 /path/to/script-or-cmd [args...]" >&2
   exit 2
 fi
 
 cd /temp || exit 1
 
 # start the target under setsid so it detaches cleanly; keep shell wrapper minimal
-nohup setsid "$TARGET" > "$LOGFILE" 2>&1 &
+# Use "$@" so program + all args are preserved
+nohup setsid "$@" > "$LOGFILE" 2>&1 &
 WRAPPER_PID=$!
 
 # small sleep to allow child processes to appear
 sleep 0.05
 
 # collect direct children and grandchildren (recursively)
-# pgrep -P returns children; we'll collect recursively using a loop
 collect_descendants() {
   local parent=$1
   local all="$parent"
@@ -38,9 +38,8 @@ collect_descendants() {
   echo "$all"
 }
 
-PIDS="$(collect_descendants $WRAPPER_PID || echo "$WRAPPER_PID")"
+PIDS="$(collect_descendants "$WRAPPER_PID" || echo "$WRAPPER_PID")"
 # Deduplicate and write one per line, prefer children first then wrapper
-# We'll print children (sorted unique) and then wrapper last.
 echo "$PIDS" | tr ' ' '\n' | awk '!x[$0]++' > "$PIDFILE"
 # ensure wrapper PID also listed if not present
 grep -qx "$WRAPPER_PID" "$PIDFILE" || printf '%s\n' "$WRAPPER_PID" >> "$PIDFILE"

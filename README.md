@@ -2,8 +2,6 @@
 
 Este repositório reúne o trabalho desenvolvido no âmbito da recolha de dados **SCADA** e da aplicação **Mod-Sentinel**, focada na deteção de ataques em redes industriais Modbus/TCP.
 
-📄 Relatório completo: [`./notas/job_report_v1.1.pdf`](./notas/job_report_v1.1.pdf)
-
 ## Estrutura
 
 - [`./notas/`](./notas/) → Relatório e notas do projeto
@@ -19,4 +17,4 @@ Este repositório reúne o trabalho desenvolvido no âmbito da recolha de dados 
 
 ---
 
-🔗 Mais detalhes no relatório: [`./notas/job_report_v1.1.pdf`](./notas/job_report_v1.1.pdf)
+🔗 Mais detalhes no relatório: [`./notas/job_report_v1.3.pdf`](./notas/job_report_v1.3.pdf)

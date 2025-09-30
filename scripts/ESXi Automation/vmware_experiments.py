@@ -46,16 +46,39 @@ def now_ts() -> str:
     return time.strftime("%Y%m%d-%H%M%S")
 
 # ---------------- ESXi connection & URL fix ---------------- #
+# Variáveis globais
 ESXI_HOST_GLOBAL: Optional[str] = None
+ESXI_CONN_INFO: Dict[str, Any] = {}
 
 def esxi_connect(host: str, user: str, password: str, insecure: bool):
-    global ESXI_HOST_GLOBAL
+    global ESXI_HOST_GLOBAL, ESXI_CONN_INFO
     ESXI_HOST_GLOBAL = host
+    ESXI_CONN_INFO = {"host": host, "user": user, "password": password, "insecure": bool(insecure)}
     if insecure:
         ctx = ssl._create_unverified_context()
         return SmartConnect(host=host, user=user, pwd=password, sslContext=ctx)
     return SmartConnect(host=host, user=user, pwd=password)
 
+def reconnect_if_needed(si):
+    global ESXI_CONN_INFO
+    try:
+        _ = si.CurrentTime()  # verifica se sessão ainda válida
+        return si
+    except Exception:
+        warn("Sessão ESXi expirada, a reconectar...")
+        try:
+            Disconnect(si)
+        except Exception:
+            pass
+        if not ESXI_CONN_INFO:
+            die("Dados de conexão ESXi não disponíveis")
+        return esxi_connect(
+            ESXI_CONN_INFO["host"],
+            ESXI_CONN_INFO["user"],
+            ESXI_CONN_INFO["password"],
+            ESXI_CONN_INFO.get("insecure", False)
+        )
+    
 def fix_esxi_url(url: str) -> str:
     global ESXI_HOST_GLOBAL
     if not ESXI_HOST_GLOBAL:
@@ -693,7 +716,10 @@ def run_experiment(si, content, cfg: Dict[str,Any], exp: Dict[str,Any]):
     except KeyboardInterrupt:
         info("Interrupt received during post_time")
 
-    # 6) stop sentinel and collect logs (all files under /Mod-Sentinel/logs/)
+    # 6) garantir que a sessão ESXi ainda está válida
+    si = reconnect_if_needed(si)
+
+    # 7) stop sentinel and collect logs (all files under /Mod-Sentinel/logs/)
     info("Stopping Mod-Sentinel and collecting logs...")
     try:
         guest_run(si, kali_vm, kali_auth, ["/bin/bash", f"cd {SENTINEL_DIR} && python3 main.py stop"], timeout_sec=120, label="sentinel_stop")
@@ -777,6 +803,9 @@ def run_experiment_no_attack(si, content, cfg: Dict[str,Any], exp: Dict[str,Any]
         countdown_minutes(duration_min, "NO-ATTACK")
     except KeyboardInterrupt:
         info("Interrupt received — proceeding to stop sentinel")
+
+    # garantir que a sessão ESXi ainda está válida
+    si = reconnect_if_needed(si)
 
     # Stop sentinel and collect logs (same as existing logic)
     info("Stopping Mod-Sentinel and collecting logs...")
@@ -870,9 +899,8 @@ def main():
                         duration = 30
 
                 # Criar "experiência" fake só para nome e organização
-                timestamp = now_ts()
                 fake_exp = {
-                    "name": f"no_attack_{timestamp}",
+                    "name": f"no_attack",
                     "description": f"Run sem ataque por {duration} minutos",
                     "pre_time": 0,
                     "attack_time": 0,

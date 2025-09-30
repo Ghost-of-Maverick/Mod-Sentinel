@@ -1,0 +1,20 @@
+STOP SCRIPT START 2025-09-30 20:01:44
+pidfile: /tmp/attack.pid
+Reading pidfile /tmp/attack.pid
+checking pid 3887
+cmdline: tee -a modbus_reader_20250930_195138.log 
+pid 3887 cmdline does not match basename run_scouting.sh, skipping
+checking pid 3886
+cmdline: python3 -u /temp/modbus_reader.py 
+pid 3886 cmdline does not match basename run_scouting.sh, skipping
+checking pid 3876
+cmdline: bash /temp/run_scouting.sh 
+Attempting pkill -TERM -P 3876 (children)
+Attempting kill -TERM 3876
+pid 3876 terminated
+Fallback: pkill -TERM -f /temp/run_scouting.sh
+Fallback: pkill -TERM -f run_scouting.sh
+Fallback escalate: KILL patterns
+Remaining pgrep -af run_scouting.sh:
+no process match
+STOP SCRIPT END 2025-09-30 20:01:46
