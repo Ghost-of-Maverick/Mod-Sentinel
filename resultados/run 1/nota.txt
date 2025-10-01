@@ -1,1 +1,2 @@
-$ ficou apenas a faltar tcp flood e fc6 flood
+$ O DoS tcp flood levou o PLC 1 a ir abaixo, o mesmo foi reiniciado a ~6:30 min do fim da experiência.
+$ RUN 1: results completed...!
