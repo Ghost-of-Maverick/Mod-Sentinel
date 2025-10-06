@@ -1,0 +1,14 @@
+STOP SCRIPT START 2025-10-02 22:20:10
+pidfile: /tmp/attack.pid
+Reading pidfile /tmp/attack.pid
+checking pid 3966
+cmdline: bash /temp/run_scouting.sh 
+Attempting pkill -TERM -P 3966 (children)
+Attempting kill -TERM 3966
+pid 3966 terminated
+Fallback: pkill -TERM -f /temp/run_scouting.sh
+Fallback: pkill -TERM -f run_scouting.sh
+Fallback escalate: KILL patterns
+Remaining pgrep -af run_scouting.sh:
+no process match
+STOP SCRIPT END 2025-10-02 22:20:12

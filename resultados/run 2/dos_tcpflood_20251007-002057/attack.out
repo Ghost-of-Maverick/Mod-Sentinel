@@ -1,0 +1,6 @@
+[+] A iniciar TCP flood com nping contra 172.27.224.250...
+
+Starting Nping 0.7.95 ( https://nmap.org/nping ) at 2025-10-06 22:20 -01
+Max rtt: 2.325ms | Min rtt: 0.010ms | Avg rtt: 0.026ms
+TCP connection attempts: 900000 | Successful connections: 4855 | Failed: 895145 (99.46%)
+Nping done: 1 IP address pinged in 139.67 seconds

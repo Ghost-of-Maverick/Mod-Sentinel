@@ -1,19 +1,20 @@
+# python3 vmware_experiments.py --esxi 192.168.136.149 --user root --password "pass" --insecure --config ./experiments.yaml
 # VMs geridas
 vms:
   - name: KaliST01
-    base_snapshot: clean
+    base_snapshot: clean-up
     guest_user: root
     guest_pass: pass
     tools_wait_sec: 120
 
   - name: OpenPLC-PRV
-    base_snapshot: clean
+    base_snapshot: temp-ruido
     guest_user: root
     guest_pass: pass
     tools_wait_sec: 120
 
   - name: OpenPLC-RTU-PRV
-    base_snapshot: clean
+    base_snapshot: temp-ruido
     guest_user: root
     guest_pass: pass
     tools_wait_sec: 120

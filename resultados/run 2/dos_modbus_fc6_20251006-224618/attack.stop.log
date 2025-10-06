@@ -1,0 +1,20 @@
+STOP SCRIPT START 2025-10-06 20:56:22
+pidfile: /tmp/attack.pid
+Reading pidfile /tmp/attack.pid
+checking pid 5204
+cmdline: tee dos_modbus_fc6_dos_2025-10-06_20-46.log 
+pid 5204 cmdline does not match basename dos_attack.sh modbus_fc6_dos 172.27.224.250 502 1 6, skipping
+checking pid 5203
+cmdline: python3 -u modbus_modify.py 172.27.224.250 502 1 6 
+pid 5203 cmdline does not match basename dos_attack.sh modbus_fc6_dos 172.27.224.250 502 1 6, skipping
+checking pid 5200
+cmdline: /bin/bash /temp/dos_attack.sh modbus_fc6_dos 172.27.224.250 502 1 6 
+Attempting pkill -TERM -P 5200 (children)
+Attempting kill -TERM 5200
+pid 5200 terminated
+Fallback: pkill -TERM -f /temp/dos_attack.sh modbus_fc6_dos 172.27.224.250 502 1 6
+Fallback: pkill -TERM -f dos_attack.sh modbus_fc6_dos 172.27.224.250 502 1 6
+Fallback escalate: KILL patterns
+Remaining pgrep -af dos_attack.sh modbus_fc6_dos 172.27.224.250 502 1 6:
+no process match
+STOP SCRIPT END 2025-10-06 20:56:24

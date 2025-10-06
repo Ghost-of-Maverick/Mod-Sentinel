@@ -1,0 +1,3 @@
+$ O DoS tcp flood levou o PLC 1 a ir abaixo, o mesmo foi reiniciado durante o ataque. 
+Não tendo reiniciado de imediato uma vez que o ataque ainda estava a ocorrer...
+$ RUN 2: results completed...!

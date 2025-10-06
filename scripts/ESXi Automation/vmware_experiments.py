@@ -788,6 +788,7 @@ def run_experiment_no_attack(si, content, cfg: Dict[str,Any], exp: Dict[str,Any]
     info("Starting Mod-Sentinel on Kali (start command)...")
     SENTINEL_DIR = "/Mod-Sentinel"
     start_cmd_text = f"cd {SENTINEL_DIR} && python3 main.py start"
+
     rc, _ = guest_run(si, kali_vm, kali_auth, ["/bin/bash", start_cmd_text], timeout_sec=60, label="sentinel_start")
     if rc != 0:
         warn("Sentinel start command retornou não-zero. Verifica logs do sentinel no guest para diagnóstico.")

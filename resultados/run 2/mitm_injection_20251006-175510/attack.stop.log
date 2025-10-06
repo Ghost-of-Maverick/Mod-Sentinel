@@ -1,0 +1,26 @@
+STOP SCRIPT START 2025-10-06 16:05:10
+pidfile: /tmp/attack.pid
+Reading pidfile /tmp/attack.pid
+checking pid 5244
+cmdline: python3 ./modbus_injector.py 
+pid 5244 cmdline does not match basename mitm_attack.sh, skipping
+checking pid 5243
+cmdline: arpspoof -i eth1 -t 172.27.224.250 172.27.224.10 
+pid 5243 cmdline does not match basename mitm_attack.sh, skipping
+checking pid 5242
+cmdline: arpspoof -i eth1 -t 172.27.224.251 172.27.224.250 
+pid 5242 cmdline does not match basename mitm_attack.sh, skipping
+checking pid 5241
+cmdline: arpspoof -i eth1 -t 172.27.224.10 172.27.224.250 
+pid 5241 cmdline does not match basename mitm_attack.sh, skipping
+checking pid 5235
+cmdline: /bin/bash /temp/mitm_attack.sh 
+Attempting pkill -TERM -P 5235 (children)
+Attempting kill -TERM 5235
+pid 5235 terminated
+Fallback: pkill -TERM -f /temp/mitm_attack.sh
+Fallback: pkill -TERM -f mitm_attack.sh
+Fallback escalate: KILL patterns
+Remaining pgrep -af mitm_attack.sh:
+no process match
+STOP SCRIPT END 2025-10-06 16:05:12

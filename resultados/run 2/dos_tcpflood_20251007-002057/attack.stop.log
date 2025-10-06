@@ -1,0 +1,17 @@
+STOP SCRIPT START 2025-10-06 22:31:01
+pidfile: /tmp/attack.pid
+Reading pidfile /tmp/attack.pid
+checking pid 5247
+pid 5247 not present
+checking pid 5250
+pid 5250 not present
+checking pid 5246
+pid 5246 not present
+checking pid 5243
+pid 5243 not present
+Fallback: pkill -TERM -f /temp/dos_attack.sh nping_tcpflood 172.27.224.250 90000 900000
+Fallback: pkill -TERM -f dos_attack.sh nping_tcpflood 172.27.224.250 90000 900000
+Fallback escalate: KILL patterns
+Remaining pgrep -af dos_attack.sh nping_tcpflood 172.27.224.250 90000 900000:
+no process match
+STOP SCRIPT END 2025-10-06 22:31:02

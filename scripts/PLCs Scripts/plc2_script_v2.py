@@ -6,7 +6,7 @@ import random
 from datetime import datetime
 import time
 from pymodbus.client import ModbusTcpClient
-from nicegui import ui
+from nicegui import ui, app
 import matplotlib.pyplot as plt
 import os
 import shutil
@@ -71,7 +71,6 @@ def get_modbus_client() -> Tuple[Optional[ModbusTcpClient], bool]:
         logger.exception("Excepção ao criar Modbus client: %s", e)
         return None, False
 
-
 def get_udp_socket():
     tries = 0
     while True:
@@ -93,7 +92,6 @@ def get_udp_socket():
             if tries >= 5:
                 logger.warning("Continuando com tentativas contínuas para recriar socket UDP...")
                 time.sleep(5)
-
 
 # ---------------- FUNÇÃO PARA SALVAR PNG ----------------
 def salvar_grafico_png():
@@ -124,41 +122,46 @@ def salvar_grafico_png():
     except Exception as e:
         logger.exception("Falha ao salvar gráfico: %s", e)
 
-
 # ---------------- MODELO FÍSICO ----------------
 def atualizar_temperatura(motor_state_local, temp, dt=1.0):
     global phase, alvo, K_CYCLE, K_CRITICO, K_RECUP, RUIDO
 
+    temp_base = temp  # base para cálculos de fase
+
     if motor_state_local == 1:
         if phase in ["ataque", "recuperacao"]:
             phase = "recuperacao"
-            delta = (alvo - temp) * (1 - math.exp(-K_RECUP * dt))
-            temp += delta
-            if abs(temp - alvo) < 0.5:
+            delta = (alvo - temp_base) * (1 - math.exp(-K_RECUP * dt))
+            temp_base += delta
+            if abs(temp_base - alvo) < 0.5:
                 phase = "ciclo"
-                alvo = random.uniform(29.5, 31.5) if temp > 35 else random.uniform(40.0, 43.0)
+                alvo = random.uniform(29.5, 31.5) if temp_base > 35 else random.uniform(40.0, 43.0)
         else:
             phase = "ciclo"
-            delta = (alvo - temp) * (1 - math.exp(-K_CYCLE * dt))
-            temp += delta
-            if abs(temp - alvo) < 0.3:
+            delta = (alvo - temp_base) * (1 - math.exp(-K_CYCLE * dt))
+            temp_base += delta
+            if abs(temp_base - alvo) < 0.3:
                 if alvo < 35:
                     alvo = random.uniform(40.0, 43.0)
                 else:
                     alvo = random.uniform(29.5, 31.5)
-
     else:
         phase = "ataque"
         ganho = 1 + random.uniform(-0.1, 0.1)
-        temp += K_CRITICO * dt * ganho
+        temp_base += K_CRITICO * dt * ganho
 
-    # Adiciona ruído controlado pelo slider
+    # Adiciona ruído limitado
     if RUIDO > 0:
-        temp += random.uniform(-RUIDO, RUIDO)
+        temp_ruido = random.uniform(-RUIDO, RUIDO)
+        # garante que o ruído não reduz temp abaixo de 29.5
+        temp = max(29.5, temp_base + temp_ruido)
+    else:
+        temp = temp_base
 
-    temp = max(TEMP_MIN, min(TEMP_MAX, temp))
+    # Limita ao máximo gráfico/segurança
+    temp = min(temp, TEMP_MAX)
+
     return temp
-
 
 # ---------------- GUI ----------------
 @ui.page('/')
@@ -284,32 +287,33 @@ def index():
                     logger.debug("Ignorando escrita Modbus porque não há ligação ativa")
 
                 # Atualizar labels
-                temp_label.set_text(f'🌡️ Temperatura: {temp_atual:.2f} ºC | 📤 Enviado: {temp_enviar} ºC')
-                estado_label.set_text(f'⚙️ Motor: {"ON" if motor_state else "OFF"} | Phase: {phase}')
-                clock_label.set_text(f'🕒 {datetime.now().strftime("%H:%M:%S")}')
-                debug_label.set_text(f"Último dado motor: {ultimo_dado_motor} | Tempo decorrido: {int(time.time()-start_time)}s")
+                if app.clients:
+                    temp_label.set_text(f'🌡️ Temperatura: {temp_atual:.2f} ºC | 📤 Enviado: {temp_enviar} ºC')
+                    estado_label.set_text(f'⚙️ Motor: {"ON" if motor_state else "OFF"} | Phase: {phase}')
+                    clock_label.set_text(f'🕒 {datetime.now().strftime("%H:%M:%S")}')
+                    debug_label.set_text(f"Último dado motor: {ultimo_dado_motor} | Tempo decorrido: {int(time.time()-start_time)}s")
 
-                # Atualizar gráfico
-                tempo_atual_s = int(time.time() - start_time)
-                data_chart = chart.options['series'][0]['data']
-                x_data = chart.options['xAxis']['data']
+                    # Atualizar gráfico
+                    tempo_atual_s = int(time.time() - start_time)
+                    data_chart = chart.options['series'][0]['data']
+                    x_data = chart.options['xAxis']['data']
 
-                data_chart.append(round(temp_atual, 1))
-                x_data.append(tempo_atual_s)
+                    data_chart.append(round(temp_atual, 1))
+                    x_data.append(tempo_atual_s)
 
-                if len(data_chart) > 100:
-                    data_chart.pop(0)
-                    x_data.pop(0)
+                    if len(data_chart) > 100:
+                        data_chart.pop(0)
+                        x_data.pop(0)
 
-                chart.options['series'][0]['data'] = data_chart
-                chart.options['xAxis']['data'] = x_data
-                chart.update()
+                    chart.options['series'][0]['data'] = data_chart
+                    chart.options['xAxis']['data'] = x_data
+                    chart.update()
 
                 # Guardar histórico
+                tempo_atual_s = int(time.time() - start_time)
                 historico_temperatura.append((tempo_atual_s, temp_atual))
 
             ui.timer(READ_INTERVAL, ciclo_simulacao)
-
 
 # ---------------- RUN ----------------
 if __name__ in {"__main__", "__mp_main__"}:
