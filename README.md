@@ -17,4 +17,4 @@ Este repositório reúne o trabalho desenvolvido no âmbito da recolha de dados 
 
 ---
 
-🔗 Mais detalhes no relatório: [`./notas/job_report_v1.3.pdf`](./notas/job_report_v1.3.pdf)
+🔗 Mais detalhes no relatório: [`./notas/job_report_v1.4.pdf`](./notas/job_report_v1.4.pdf)
