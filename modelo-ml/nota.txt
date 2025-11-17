@@ -1,0 +1,5 @@
+Tarefas ainda a realizar:
+
+* Obter as 5 runs que preciso para testar os modelos (já tenho 2 runs)
+* Testar anomaly detection, onde dou ao modelo apenas tráfego benigno de treino, imaginando 3 runs, e depois ele tem de tentar detetar anomalias, vamos imaginar 2 runs de ataques.
+    Não está a dar bons resultados...
