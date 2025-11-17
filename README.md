@@ -12,5 +12,5 @@ Este repositório reúne o trabalho desenvolvido no âmbito da recolha de dados 
 
 ---
 
-🔗 Mais detalhes no relatório: [`./notas/job_report_v1.4.pdf`](./notas/job_report_v1.5.pdf)
+🔗 Mais detalhes no relatório: [`./notas/job_report_v1.4.pdf`](./notas/job_report_v1.5.pdf)<br>
 🔗 Ver também o relatório da arquitetura base do sistema: [`./notas/Infrastructure_report_v1.1.pdf`](./notas/Infrastructure_report_v1.1.pdf)
