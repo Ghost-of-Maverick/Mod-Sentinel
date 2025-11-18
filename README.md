@@ -1,5 +1,11 @@
-<img src="./notas/logo_modsentinel.png" alt="Mod-Sentinel Logo" width="180"/>
-# Prova de Conceito de um Sistema de Deteção de Intrusões para Sistemas de Controlo Industriais baseado em Machine Learning
+<p align="center">
+  <img src="./notas/logo_modsentinel.png" alt="Mod-Sentinel Logo" width="200"/>
+</p>
+
+<h1 align="center">Mod-Sentinel</h1>
+<h3 align="center">Prova de Conceito de um Sistema de Deteção de Intrusões para ICS baseado em Machine Learning</h3>
+
+---
 
 A segurança de sistemas industriais tornou-se um vetor crítico na proteção de infraestruturas essenciais. A convergência entre tecnologia operacional (OT) e tecnologia de informação (IT) expôs redes industriais a novos riscos, especialmente em ambientes baseados em protocolos como o Modbus/TCP, que continuam a ser amplamente utilizados mas carecem de mecanismos nativos de autenticação e encriptação. Este trabalho apresenta o desenvolvimento e validação de um protótipo funcional de um sistema de deteção de intrusões baseado em Machine Learning, aplicado a um cenário SCADA virtualizado que replica o comportamento de um sistema real de controlo de processos.<br>
 
