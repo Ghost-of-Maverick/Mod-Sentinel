@@ -1,5 +1,3 @@
-<h1 align="center">Mod-Sentinel</h1>
-
 <p align="center">
   <img src="./notas/logo_modsentinel.png" alt="Mod-Sentinel Logo" width="200"/>
 </p>
