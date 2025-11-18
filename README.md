@@ -5,11 +5,9 @@
 
 ---
 
-A proteção de sistemas industriais tornou-se central na segurança de infraestruturas críticas. A aproximação entre OT e IT trouxe novas superfícies de ataque, agravadas pelo uso contínuo de protocolos como Modbus/TCP, que carecem de autenticação, encriptação e validação de integridade.
+A proteção de sistemas industriais tornou-se importante na segurança de infraestruturas críticas. A aproximação entre OT e IT trouxe novas superfícies de ataque, agravadas pelo uso contínuo de protocolos como Modbus/TCP, que carecem de autenticação, encriptação e validação de integridade.
 
-Este projeto apresenta o **Mod-Sentinel**, uma prova de conceito de um sistema de deteção de intrusões baseado em Machine Learning, validado
-num ambiente SCADA virtualizado que replica um cenário industrial realista. O ambiente inclui PLCs virtuais, HMI, attacker node e
-monitorização passiva através de uma interface em modo promíscuo no ESXi.
+Este projeto apresenta o **Mod-Sentinel**, uma prova de conceito de um sistema de deteção de intrusões baseado em Machine Learning, validado num ambiente SCADA virtualizado que replica um cenário industrial realista. O ambiente inclui PLCs virtuais, HMI, attacker node e monitorização passiva através de uma interface em modo promíscuo no ESXi.
 
 A simulação do processo físico, nomeadamente da temperatura do óleo controlada pelos PLCs, foi criada com o intuito de refletir um dinamismo real, integrando ruído, curvas assintóticas e dependência do estado do motor. Com este ambiente, foram gerados datasets completos com tráfego legítimo e malicioso: DoS, MitM com manipulação de pacotes Modbus e operações de scouting.
 
