@@ -1,7 +1,7 @@
 <p align="center">
   <img src="./notas/logo_modsentinel.png" alt="Mod-Sentinel Logo" width="200"/>
 </p>
-<h3 align="center">Prova de Conceito de um Sistema de Deteção de Intrusões para ICS baseado em Machine Learning</h3>
+<h3 align="center">Prova de Conceito de um Sistema de Deteção de Intrusões para ICS baseado em ML</h3>
 
 ---
 
